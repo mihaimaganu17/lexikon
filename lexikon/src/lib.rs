@@ -5,6 +5,9 @@ unsafe extern "C" {
     // returned.  If no option value is to be supplied or returned, option_value may be NULL.
     fn getsockopt(socket: i32, level: i32, option_name: i32, option_value: *mut core::ffi::c_void,
         option_len: *mut u32) -> i32;
+
+    fn setsockopt(socket: i32, level: i32, option_name: i32, option_value: *mut core::ffi::c_void,
+        option_len: u32) -> i32;
 }
 
 /// Comprises types of communication domains whithin which communication will take place. These
@@ -28,6 +31,7 @@ mod level {
 }
 
 mod socket_option {
+    // These option flags are a bit mask of all ORed together.
     // Allow local address reuse
     pub const SO_REUSEADDR: i32 = 0x0004;
 }
@@ -44,16 +48,44 @@ mod tests {
         println!("{}", fd);
         assert!(fd != -1);
 
-        let mut option_value = 10i32;
+        let mut option_value = 10u32;
         let mut option_len = core::mem::size_of::<u32>() as u32;
         // We want to set the SO_REUSEADDR option to value of 1. We first check the value of the
         // option
         let status = unsafe {
             getsockopt(fd, level::SOL_SOCKET, socket_option::SO_REUSEADDR
-            , &mut option_value as *mut i32 as *mut core::ffi::c_void,
+            , &mut option_value as *mut u32 as *mut core::ffi::c_void,
             &mut option_len as *mut u32)
         };
 
+        // TODO: Turn this to a macro
+        if status == -1 {
+            println!("Status {:?} -> {:?}", status, std::io::Error::last_os_error());
+        }
+        println!("Option value {:?}, option len {:?}", option_value, option_len);
+
+        // Set socket reuse address to 1
+        option_value = 1u32;
+        let status = unsafe {
+            setsockopt(fd, level::SOL_SOCKET, socket_option::SO_REUSEADDR
+            , &mut option_value as *mut u32 as *mut core::ffi::c_void,
+            option_len)
+        };
+        if status == -1 {
+            println!("Status {:?} -> {:?}", status, std::io::Error::last_os_error());
+        }
+        println!("Option value {:?}, option len {:?}", option_value, option_len);
+
+        //option_value = 1i32;
+        // We want to set the SO_REUSEADDR option to value of 1. We first check the value of the
+        // option
+        let status = unsafe {
+            getsockopt(fd, level::SOL_SOCKET, socket_option::SO_REUSEADDR
+            , &mut option_value as *mut u32 as *mut core::ffi::c_void,
+            &mut option_len as *mut u32)
+        };
+
+        // TODO: Turn this to a macro
         if status == -1 {
             println!("Status {:?} -> {:?}", status, std::io::Error::last_os_error());
         }
