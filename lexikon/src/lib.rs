@@ -1,5 +1,10 @@
 unsafe extern "C" {
     fn socket(domain: i32, t_type: i32, protocol: i32) -> i32;
+    // option_len is a value-result parameter, initially containing the size of the buffer pointed
+    // to by option_value, and modified on return to indicate the actual size of the value
+    // returned.  If no option value is to be supplied or returned, option_value may be NULL.
+    fn getsockopt(socket: i32, level: i32, option_name: i32, option_value: *mut core::ffi::c_void,
+        option_len: *mut u32) -> i32;
 }
 
 /// Comprises types of communication domains whithin which communication will take place. These
@@ -17,6 +22,16 @@ mod socket_type {
     pub const SOCK_DGRAM: i32 = 2;
 }
 
+mod level {
+    // Seems to be the only viable level
+    pub const SOL_SOCKET: i32 = 0xFFFF;
+}
+
+mod socket_option {
+    // Allow local address reuse
+    pub const SO_REUSEADDR: i32 = 0x0004;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28,5 +43,20 @@ mod tests {
         };
         println!("{}", fd);
         assert!(fd != -1);
+
+        let mut option_value = 10i32;
+        let mut option_len = core::mem::size_of::<u32>() as u32;
+        // We want to set the SO_REUSEADDR option to value of 1. We first check the value of the
+        // option
+        let status = unsafe {
+            getsockopt(fd, level::SOL_SOCKET, socket_option::SO_REUSEADDR
+            , &mut option_value as *mut i32 as *mut core::ffi::c_void,
+            &mut option_len as *mut u32)
+        };
+
+        if status == -1 {
+            println!("Status {:?} -> {:?}", status, std::io::Error::last_os_error());
+        }
+        println!("Option value {:?}, option len {:?}", option_value, option_len);
     }
 }
