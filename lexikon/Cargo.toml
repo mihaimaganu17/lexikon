@@ -4,6 +4,6 @@ description = "Education Redis implementation"
 license = "TODO"
 version = "0.1.0"
 edition = "2024"
-author = ["Mihai Maganu <maganu.mihu@gmail.com>"]
+authors = ["Mihai Maganu <maganu.mihu@gmail.com>"]
 
 [dependencies]
