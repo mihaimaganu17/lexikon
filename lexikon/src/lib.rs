@@ -24,6 +24,10 @@ unsafe extern "C" {
     fn bind(socket_fd: i32, sock_addr: &SockAddr, sock_len: u32) -> i32;
     // Listen to incoming connections for socket, with a queue limit of `backlog`
     fn listen(socket_fd: i32, backlog: u32) -> i32;
+    // Accept a connection to a socket. Returns a descriptor for the accepted client socket or
+    // -1 in case of an error. The `sock_addr` is populated with the resulting address of the
+    // client that was accepted for a connection.
+    fn accept(socket_fd: i32, sock_addr: &mut SockAddr, sock_len: &mut u32) -> i32;
 }
 
 /// Comprises types of communication domains whithin which communication will take place. These
@@ -71,6 +75,7 @@ macro_rules! check_status {
 // sockaddr as defined by the xnu kernel, which has a bit of a different layout overall, however
 // it does keep compatibility with the historical UNIX sockaddr_in
 #[repr(C)]
+#[derive(Default)]
 struct SockAddr {
     sa_len: u8,
     sa_family: u8,
@@ -134,6 +139,17 @@ pub fn start_server() -> Result<(), ServerError> {
     // 4. listen for incoming connetctions
     let status = unsafe { listen(fd, SOMAXCONN) };
     check_status!(status);
+
+    // 5. Accept incoming connections
+    loop {
+        let mut client_sock_addr = SockAddr::default();
+        let mut sock_addr_len: u32 = core::mem::size_of::<SockAddr>() as u32;
+
+        let conn_fd = accept(fd, &mut clien_sock_addr, &mut sock_addr_len);
+
+        check_status!(status);
+        println!("Connected: {:?}", status);
+    }
 
     Ok(())
 }
