@@ -46,6 +46,19 @@ mod socket_option {
     pub const SO_REUSEADDR: i32 = 0x0004;
 }
 
+macro_rules! check_status {
+    ($status:expr) => {
+        if $status == -1 {
+            // Should this be a return?
+            println!(
+                "Status {:?} -> {:?}",
+                $status,
+                std::io::Error::last_os_error()
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,7 +66,6 @@ mod tests {
     #[test]
     fn test_socket() {
         let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
-        println!("{}", fd);
         assert!(fd != -1);
 
         let mut option_value = 10u32;
@@ -70,14 +82,7 @@ mod tests {
             )
         };
 
-        // TODO: Turn this to a macro
-        if status == -1 {
-            println!(
-                "Status {:?} -> {:?}",
-                status,
-                std::io::Error::last_os_error()
-            );
-        }
+        check_status!(status);
 
         // Set socket reuse address to 1
         option_value = 1u32;
@@ -90,13 +95,8 @@ mod tests {
                 option_len,
             )
         };
-        if status == -1 {
-            println!(
-                "Status {:?} -> {:?}",
-                status,
-                std::io::Error::last_os_error()
-            );
-        }
+
+        check_status!(status);
 
         // This second call should return 4 as the flags are part of a bit mask, and SO_REUSEADDR
         // holds the third byte of that bitmask.
@@ -110,17 +110,6 @@ mod tests {
             )
         };
 
-        // TODO: Turn this to a macro
-        if status == -1 {
-            println!(
-                "Status {:?} -> {:?}",
-                status,
-                std::io::Error::last_os_error()
-            );
-        }
-        println!(
-            "Option value {:?}, option len {:?}",
-            option_value, option_len
-        );
+        check_status!(status);
     }
 }
