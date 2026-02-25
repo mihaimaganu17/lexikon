@@ -28,7 +28,13 @@ unsafe extern "C" {
     // -1 in case of an error. The `sock_addr` is populated with the resulting address of the
     // client that was accepted for a connection.
     fn accept(socket_fd: i32, sock_addr: &mut SockAddr, sock_len: &mut u32) -> i32;
+    // Read `nbyte` bytes from the file descriptor `fildes` into the given `buffer`. Returns the
+    // number of bytes read. If the return is 0, we reached end of file. If the return is -1, we
+    // have an error and the global errno is set.
+    fn read(socked_fd: i32, buffer: *mut core::ffi::c_void, nbyte: u32) -> i32;
 }
+
+// TODO: Use RawFd for the socket?
 
 /// Comprises types of communication domains whithin which communication will take place. These
 /// are also regarded as address families (AF_)
@@ -142,9 +148,23 @@ pub fn start_server() -> Result<(), ServerError> {
         let conn_fd = unsafe { accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
 
         check_status!(conn_fd);
+
+        read_and_respond(conn_fd);
     }
 
     Ok(())
+}
+
+fn read_and_respond(fd: i32) {
+    let mut buffer = [0u8; 64];
+    let bytes_read = unsafe {
+        read(fd, buffer.as_mut_ptr() as *mut core::ffi::c_void, buffer.len() as u32)
+    };
+    check_status!(bytes_read);
+
+    println!("{}", String::from_utf8_lossy(&buffer));
+
+//    let buffer = String::from("world").as_bytes();
 }
 
 #[derive(Debug)]
