@@ -36,6 +36,8 @@ unsafe extern "C" {
     // completion, returns the number of bytes written. If the return value is -1, we have an error
     // and the global errno is set.
     fn write(socked_fd: i32, buffer: *const core::ffi::c_void, nbyte: u32) -> i32;
+    // Close a descriptor
+    fn close(fd: i32) -> i32;
 }
 
 // TODO: Use RawFd for the socket?
@@ -154,6 +156,8 @@ pub fn start_server() -> Result<(), ServerError> {
         check_status!(conn_fd);
 
         read_and_respond(conn_fd);
+        let status = unsafe { close(conn_fd) };
+        check_status!(conn_fd);
     }
 
     Ok(())
@@ -161,14 +165,20 @@ pub fn start_server() -> Result<(), ServerError> {
 
 fn read_and_respond(fd: i32) {
     let mut buffer = [0u8; 64];
-    let bytes_read = unsafe {
-        read(fd, buffer.as_mut_ptr() as *mut core::ffi::c_void, buffer.len() as u32)
-    };
-    check_status!(bytes_read);
+    loop {
+        let bytes_read = unsafe {
+            read(fd, buffer.as_mut_ptr() as *mut core::ffi::c_void, buffer.len() as u32)
+        };
+        check_status!(bytes_read);
 
-    println!("{}", String::from_utf8_lossy(&buffer));
+        println!("{}", String::from_utf8_lossy(&buffer));
+        // We finished reading
+        if (bytes_read as usize) < buffer.len() {
+            break
+        }
+    }
 
-    let write_buffer = String::from("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n<!DOCTYPE html>\r\n<html>hello</html>\0");
+    let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
 
     let bytes_w = unsafe {
         write(fd, write_buffer.as_ptr() as *const core::ffi::c_void, write_buffer.len() as u32)
