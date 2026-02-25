@@ -56,10 +56,10 @@ macro_rules! check_status {
                 std::io::Error::last_os_error()
             );
         }
-    }
+    };
 }
 
-fn start_server() -> Result<(), ServerError> {
+pub fn start_server() -> Result<(), ServerError> {
     let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
 
     if fd == -1 {
