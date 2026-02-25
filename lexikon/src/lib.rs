@@ -28,10 +28,14 @@ unsafe extern "C" {
     // -1 in case of an error. The `sock_addr` is populated with the resulting address of the
     // client that was accepted for a connection.
     fn accept(socket_fd: i32, sock_addr: &mut SockAddr, sock_len: &mut u32) -> i32;
-    // Read `nbyte` bytes from the file descriptor `fildes` into the given `buffer`. Returns the
+    // Read `nbyte` bytes from the file descriptor `fd` into the given `buffer`. Returns the
     // number of bytes read. If the return is 0, we reached end of file. If the return is -1, we
     // have an error and the global errno is set.
-    fn read(socked_fd: i32, buffer: *mut core::ffi::c_void, nbyte: u32) -> i32;
+    fn read(fd: i32, buffer: *mut core::ffi::c_void, nbyte: u32) -> i32;
+    // Write `nbyte` bytes to the file descriptor `fd` from the given `buffer`. Upon successful 
+    // completion, returns the number of bytes written. If the return value is -1, we have an error
+    // and the global errno is set.
+    fn write(socked_fd: i32, buffer: *const core::ffi::c_void, nbyte: u32) -> i32;
 }
 
 // TODO: Use RawFd for the socket?
@@ -164,7 +168,13 @@ fn read_and_respond(fd: i32) {
 
     println!("{}", String::from_utf8_lossy(&buffer));
 
-//    let buffer = String::from("world").as_bytes();
+    let write_buffer = String::from("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n<!DOCTYPE html>\r\n<html>hello</html>\0");
+
+    let bytes_w = unsafe {
+        write(fd, write_buffer.as_ptr() as *const core::ffi::c_void, write_buffer.len() as u32)
+    };
+    check_status!(bytes_w);
+    println!("Wrote {} bytes", bytes_w);
 }
 
 #[derive(Debug)]
