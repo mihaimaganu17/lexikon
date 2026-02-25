@@ -18,6 +18,10 @@ unsafe extern "C" {
         option_value: *mut core::ffi::c_void,
         option_len: u32,
     ) -> i32;
+    // bind() assigns a name to an unnamed socket.  When a socket is created with socket(2) it
+    // exists in a name space (address family) but has no name assigned.  bind() requests that
+    // address be assigned to the socket
+    fn bind(socket_fd: u32, sock_addr: &SockAddr, sock_len: u32) -> i32;
 }
 
 /// Comprises types of communication domains whithin which communication will take place. These
@@ -59,13 +63,42 @@ macro_rules! check_status {
     };
 }
 
+// sockaddr as defined by the xnu kernel, which has a bit of a different layout overall, however
+// it does keep compatibility with the historical UNIX sockaddr_in
+#[repr(C)]
+struct SockAddr {
+    sa_len: u8,
+    sa_family: u8,
+    // This data is structured as follows:
+    // port: u16 -> first 2 bytes (big endian)
+    // addr: u32 -> first 4 bytes (big endian)
+    // padding: rest of 8 bytes (zero padding)
+    sa_data: [u8; 14],
+}
+
+impl SockAddr {
+    fn new(sa_family: u8, addr: u32, port: u16) -> Self {
+        let mut sa_data = [0; 14];
+        // Fill port
+        sa_data[0..2].copy_from_slice(&port.to_be_bytes());
+        sa_data[2..6].copy_from_slice(&addr.to_be_bytes());
+        Self {
+            // This cast is safe as the size of SockAddr will always be 16
+            sa_len: core::mem::size_of::<SockAddr>() as u8,
+            sa_family,
+            sa_data,
+        }
+    }
+}
+
 pub fn start_server() -> Result<(), ServerError> {
+    // 1. Create socket
     let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
 
     if fd == -1 {
         return Err(ServerError::InvalidSocketHandle);
     }
-    // Set socket reuse address to 1
+    // 2. Set socket reuse address option to 1
     let mut option_value = 1u32;
     let option_len = core::mem::size_of::<u32>() as u32;
 
@@ -79,6 +112,9 @@ pub fn start_server() -> Result<(), ServerError> {
         )
     };
     check_status!(status);
+
+    // 3. Bind to an address
+
 
     Ok(())
 }
