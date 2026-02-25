@@ -32,7 +32,7 @@ unsafe extern "C" {
     // number of bytes read. If the return is 0, we reached end of file. If the return is -1, we
     // have an error and the global errno is set.
     fn read(fd: i32, buffer: *mut core::ffi::c_void, nbyte: u32) -> i32;
-    // Write `nbyte` bytes to the file descriptor `fd` from the given `buffer`. Upon successful 
+    // Write `nbyte` bytes to the file descriptor `fd` from the given `buffer`. Upon successful
     // completion, returns the number of bytes written. If the return value is -1, we have an error
     // and the global errno is set.
     fn write(socked_fd: i32, buffer: *const core::ffi::c_void, nbyte: u32) -> i32;
@@ -157,7 +157,7 @@ pub fn start_server() -> Result<(), ServerError> {
 
         read_and_respond(conn_fd);
         let status = unsafe { close(conn_fd) };
-        check_status!(conn_fd);
+        check_status!(status);
     }
 
     Ok(())
@@ -167,21 +167,29 @@ fn read_and_respond(fd: i32) {
     let mut buffer = [0u8; 64];
     loop {
         let bytes_read = unsafe {
-            read(fd, buffer.as_mut_ptr() as *mut core::ffi::c_void, buffer.len() as u32)
+            read(
+                fd,
+                buffer.as_mut_ptr() as *mut core::ffi::c_void,
+                buffer.len() as u32,
+            )
         };
         check_status!(bytes_read);
 
         println!("{}", String::from_utf8_lossy(&buffer));
         // We finished reading
         if (bytes_read as usize) < buffer.len() {
-            break
+            break;
         }
     }
 
     let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
 
     let bytes_w = unsafe {
-        write(fd, write_buffer.as_ptr() as *const core::ffi::c_void, write_buffer.len() as u32)
+        write(
+            fd,
+            write_buffer.as_ptr() as *const core::ffi::c_void,
+            write_buffer.len() as u32,
+        )
     };
     check_status!(bytes_w);
     println!("Wrote {} bytes", bytes_w);
