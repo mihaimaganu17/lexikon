@@ -126,13 +126,7 @@ pub fn start_server() -> Result<(), ServerError> {
     // 3. Bind to an address
     let sock_addr = SockAddr::new(domain::AF_INET as u8, 0, 1234);
 
-    let status = unsafe {
-        bind(
-            fd,
-            &sock_addr,
-            core::mem::size_of::<SockAddr>() as u32,
-        )
-    };
+    let status = unsafe { bind(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
 
     check_status!(status);
 
@@ -145,10 +139,9 @@ pub fn start_server() -> Result<(), ServerError> {
         let mut client_sock_addr = SockAddr::default();
         let mut sock_addr_len: u32 = core::mem::size_of::<SockAddr>() as u32;
 
-        let conn_fd = accept(fd, &mut clien_sock_addr, &mut sock_addr_len);
+        let conn_fd = unsafe { accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
 
-        check_status!(status);
-        println!("Connected: {:?}", status);
+        check_status!(conn_fd);
     }
 
     Ok(())
