@@ -59,9 +59,43 @@ macro_rules! check_status {
     }
 }
 
+fn start_server() -> Result<(), ServerError> {
+    let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
+
+    if fd == -1 {
+        return Err(ServerError::InvalidSocketHandle);
+    }
+    // Set socket reuse address to 1
+    let mut option_value = 1u32;
+    let option_len = core::mem::size_of::<u32>() as u32;
+
+    let status = unsafe {
+        setsockopt(
+            fd,
+            level::SOL_SOCKET,
+            socket_option::SO_REUSEADDR,
+            &mut option_value as *mut u32 as *mut core::ffi::c_void,
+            option_len,
+        )
+    };
+    check_status!(status);
+
+    Ok(())
+}
+
+#[derive(Debug)]
+pub enum ServerError {
+    InvalidSocketHandle,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_main() {
+        start_server().expect("Failed to start server");
+    }
 
     #[test]
     fn test_socket() {
@@ -82,7 +116,7 @@ mod tests {
             )
         };
 
-        check_status!(status);
+        assert!(status == 0);
 
         // Set socket reuse address to 1
         option_value = 1u32;
@@ -96,7 +130,7 @@ mod tests {
             )
         };
 
-        check_status!(status);
+        assert!(status == 0);
 
         // This second call should return 4 as the flags are part of a bit mask, and SO_REUSEADDR
         // holds the third byte of that bitmask.
@@ -110,6 +144,6 @@ mod tests {
             )
         };
 
-        check_status!(status);
+        assert!(status == 0);
     }
 }
