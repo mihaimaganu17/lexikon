@@ -21,7 +21,9 @@ unsafe extern "C" {
     // bind() assigns a name to an unnamed socket.  When a socket is created with socket(2) it
     // exists in a name space (address family) but has no name assigned.  bind() requests that
     // address be assigned to the socket
-    fn bind(socket_fd: u32, sock_addr: &SockAddr, sock_len: u32) -> i32;
+    fn bind(socket_fd: i32, sock_addr: &SockAddr, sock_len: u32) -> i32;
+    // Listen to incoming connections for socket, with a queue limit of `backlog`
+    fn listen(socket_fd: i32, backlog: u32) -> i32;
 }
 
 /// Comprises types of communication domains whithin which communication will take place. These
@@ -49,6 +51,9 @@ mod socket_option {
     // Allow local address reuse
     pub const SO_REUSEADDR: i32 = 0x0004;
 }
+
+// Maximum queue length specifiable for a `listen` call on XNU
+pub(crate) const SOMAXCONN: u32 = 128;
 
 macro_rules! check_status {
     ($status:expr) => {
@@ -118,12 +123,16 @@ pub fn start_server() -> Result<(), ServerError> {
 
     let status = unsafe {
         bind(
-            fd as u32,
+            fd,
             &sock_addr,
             core::mem::size_of::<SockAddr>() as u32,
         )
     };
 
+    check_status!(status);
+
+    // 4. listen for incoming connetctions
+    let status = unsafe { listen(fd, SOMAXCONN) };
     check_status!(status);
 
     Ok(())
