@@ -114,7 +114,13 @@ pub fn start_server() -> Result<(), ServerError> {
     check_status!(status);
 
     // 3. Bind to an address
+    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0, 1234);
 
+    let status = unsafe {
+        bind(fd as u32, &sock_addr, core::mem::size_of::<SockAddr>() as u32)
+    };
+
+    check_status!(status);
 
     Ok(())
 }
