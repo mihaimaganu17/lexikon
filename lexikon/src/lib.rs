@@ -56,7 +56,7 @@ mod socket_type {
     // Stream socket: TCP
     pub const SOCK_STREAM: i32 = 1;
     // Datagram socket: UDP
-    pub const SOCK_DGRAM: i32 = 2;
+    pub const _SOCK_DGRAM: i32 = 2;
 }
 
 mod level {
@@ -162,8 +162,6 @@ pub fn start_server() -> Result<(), ServerError> {
         let status = unsafe { close(conn_fd) };
         check_status!(status);
     }
-
-    Ok(())
 }
 
 fn buffered_read(fd: i32) -> Vec<u8> {
@@ -225,14 +223,18 @@ pub fn start_client() -> Result<(), ClientError> {
 
     // 2. Connect to the loopback address -> 127.0.0.1
     let sock_addr = SockAddr::new(domain::AF_INET as u8, 0x7f000001, 1234);
-    print!("Connecting\n");
 
     let status = unsafe { connect(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
     check_status!(status);
-    print!("Connected\n");
 
     let msg = String::from("hello");
-    let bytes_w = unsafe { write(fd, msg.as_ptr() as *const core::ffi::c_void, msg.len() as u32) };
+    let _bytes_w = unsafe {
+        write(
+            fd,
+            msg.as_ptr() as *const core::ffi::c_void,
+            msg.len() as u32,
+        )
+    };
 
     let buffer = buffered_read(fd);
 
