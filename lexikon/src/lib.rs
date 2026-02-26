@@ -180,7 +180,7 @@ fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError>{
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
-    let write_buffer_len = write_buffer.len().to_le_bytes();
+    let write_buffer_len = (write_buffer.len() as u32).to_le_bytes();
     let mut bytes_written = write_full(fd, &write_buffer_len)?;
     bytes_written += write_full(fd, write_buffer)?;
 
@@ -194,6 +194,7 @@ fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
 
     while left_to_read > 0 {
         let max_bytes_to_read = core::cmp::min(left_to_read, buffer.len());
+        println!("{:#?}", max_bytes_to_read);
         let bytes_read = unsafe {
             read(
                 fd,
@@ -202,6 +203,7 @@ fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
             )
         };
         check_status!(bytes_read);
+        println!("Bytes read {:?}", bytes_read);
         left_to_read = left_to_read.saturating_sub(bytes_read as usize);
         full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
     }
