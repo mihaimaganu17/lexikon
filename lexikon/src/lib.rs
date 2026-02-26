@@ -175,15 +175,14 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError>{
     Ok(msg)
 }
 
-fn write_msg(fd: i32) -> Result<usize, WriteError>{
+fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError>{
     // We preparea a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
-    let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
     let write_buffer_len = write_buffer.len().to_le_bytes();
     let mut bytes_written = write_full(fd, &write_buffer_len)?;
-    bytes_written += write_full(fd, &write_buffer.as_bytes())?;
+    bytes_written += write_full(fd, write_buffer)?;
 
     Ok(bytes_written)
 }
@@ -233,21 +232,15 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
     Ok(end)
 }
 
-fn read_and_respond(fd: i32) -> Result<(), ReadError> {
-    let msg = read_msg(fd)?;
+fn read_and_respond(fd: i32) -> Result<(), ServerError> {
+    // 1. Read client message
+    let msg = read_msg(fd).unwrap();
     println!("{}", String::from_utf8_lossy(&msg));
 
+    // 2. Write message back to client
     let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
-
-    let bytes_w = unsafe {
-        write(
-            fd,
-            write_buffer.as_ptr() as *const core::ffi::c_void,
-            write_buffer.len() as u32,
-        )
-    };
-    check_status!(bytes_w);
-    println!("Wrote {} bytes", bytes_w);
+    let bytes_written = write_msg(fd, write_buffer.as_bytes()).unwrap();
+    println!("Wrote {} bytes", bytes_written);
 
     Ok(())
 }
