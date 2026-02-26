@@ -183,13 +183,37 @@ fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
     return full_buffer
 }
 
+fn write_full(fd: i32, buffer: &[u8]) -> Result<(), WriteError> {
+    let mut left_to_write = buffer.len();
+    // How many bytes to write per each write call
+    let window_write_len = 64usize;
+    let mut start = 0;
+    let mut end = 0;
+
+    while end < buffer.len() {
+        let end = start + window_write_len;
+        let end = core::cmp::min(end, buffer.len());
+        let slice = buffer.get(start..end).ok_or(WriteError::InvalidRange(start, end))?;
+        let bytes_written = unsafe {
+            write(
+                fd,
+                slice.as_ptr() as *const core::ffi::c_void,
+                slice.len() as u32,
+            )
+        };
+        check_status!(bytes_written);
+        start = end;
+    }
+    Ok(())
+}
+
 fn read_and_respond(fd: i32) -> Result<(), ReadError> {
     // We preparea a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
     let buffer = read_full(fd, 4);
-    let buffer_len = usize::try_from(u32::from_le_bytes(buffer.get(0..4).ok_or(ReadError::InvalidRange)?.try_into()?))?;
+    let buffer_len = usize::try_from(u32::from_le_bytes(buffer.get(0..4).ok_or(ReadError::InvalidRange(0, 4))?.try_into()?))?;
 
     let msg = read_full(fd, buffer_len);
 
@@ -222,7 +246,7 @@ pub enum ClientError {
 
 #[derive(Debug)]
 pub enum ReadError {
-    InvalidRange,
+    InvalidRange(usize, usize),
     TryFromSliceError(std::array::TryFromSliceError),
     TryFromIntError(std::num::TryFromIntError),
 }
@@ -239,6 +263,10 @@ impl From<std::num::TryFromIntError> for ReadError {
     }
 }
 
+#[derive(Debug)]
+pub enum WriteError {
+    InvalidRange(usize, usize),
+}
 
 
 pub fn start_client() -> Result<(), ClientError> {
