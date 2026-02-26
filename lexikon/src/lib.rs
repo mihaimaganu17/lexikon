@@ -106,6 +106,7 @@ impl SockAddr {
         // Fill port
         sa_data[0..2].copy_from_slice(&port.to_be_bytes());
         sa_data[2..6].copy_from_slice(&addr.to_be_bytes());
+        println!("{:x?}", sa_data);
         Self {
             // This cast is safe as the size of SockAddr will always be 16
             sa_len: core::mem::size_of::<SockAddr>() as u8,
@@ -223,10 +224,12 @@ pub fn start_client() -> Result<(), ClientError> {
     }
 
     // 2. Connect to the loopback address -> 127.0.0.1
-    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0x0100_007f, 1234);
+    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0x7f000001, 1234);
+    print!("Connecting\n");
 
     let status = unsafe { connect(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
     check_status!(status);
+    print!("Connected\n");
 
     let msg = String::from("hello");
     let bytes_w = unsafe { write(fd, msg.as_ptr() as *const core::ffi::c_void, msg.len() as u32) };
