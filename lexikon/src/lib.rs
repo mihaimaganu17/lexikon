@@ -35,9 +35,11 @@ unsafe extern "C" {
     // Write `nbyte` bytes to the file descriptor `fd` from the given `buffer`. Upon successful
     // completion, returns the number of bytes written. If the return value is -1, we have an error
     // and the global errno is set.
-    fn write(socked_fd: i32, buffer: *const core::ffi::c_void, nbyte: u32) -> i32;
+    fn write(socket_fd: i32, buffer: *const core::ffi::c_void, nbyte: u32) -> i32;
     // Close a descriptor
     fn close(fd: i32) -> i32;
+    // Initiate a connection using the `socket_fd` to the address specified by `sock_addr`
+    fn connect(socket_fd: i32, sock_addr: &SockAddr, sock_len: u32) -> i32;
 }
 
 // TODO: Use RawFd for the socket?
@@ -163,7 +165,8 @@ pub fn start_server() -> Result<(), ServerError> {
     Ok(())
 }
 
-fn read_and_respond(fd: i32) {
+fn buffered_read(fd: i32) -> Vec<u8> {
+    let mut full_buffer = vec![];
     let mut buffer = [0u8; 64];
     loop {
         let bytes_read = unsafe {
@@ -173,14 +176,20 @@ fn read_and_respond(fd: i32) {
                 buffer.len() as u32,
             )
         };
+        full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
         check_status!(bytes_read);
 
-        println!("{}", String::from_utf8_lossy(&buffer));
         // We finished reading
         if (bytes_read as usize) < buffer.len() {
-            break;
+            return full_buffer;
         }
     }
+}
+
+fn read_and_respond(fd: i32) {
+    let buffer = buffered_read(fd);
+
+    println!("{}", String::from_utf8_lossy(&buffer));
 
     let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
 
@@ -198,6 +207,35 @@ fn read_and_respond(fd: i32) {
 #[derive(Debug)]
 pub enum ServerError {
     InvalidSocketHandle,
+}
+
+#[derive(Debug)]
+pub enum ClientError {
+    InvalidSocketHandle,
+}
+
+pub fn start_client() -> Result<(), ClientError> {
+    // 1. Create socket
+    let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
+
+    if fd == -1 {
+        return Err(ClientError::InvalidSocketHandle);
+    }
+
+    // 2. Connect to the loopback address -> 127.0.0.1
+    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0x0100_007f, 1234);
+
+    let status = unsafe { connect(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
+    check_status!(status);
+
+    let msg = String::from("hello");
+    let bytes_w = unsafe { write(fd, msg.as_ptr() as *const core::ffi::c_void, msg.len() as u32) };
+
+    let buffer = buffered_read(fd);
+
+    println!("{}", String::from_utf8_lossy(&buffer));
+    unsafe { close(fd) };
+    Ok(())
 }
 
 #[cfg(test)]
