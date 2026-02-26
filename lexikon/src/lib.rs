@@ -119,14 +119,13 @@ impl SockAddr {
 pub fn start_server() -> Result<(), ServerError> {
     // 1. Create socket
     let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
-
     if fd == -1 {
         return Err(ServerError::InvalidSocketHandle);
     }
+
     // 2. Set socket reuse address option to 1
     let mut option_value = 1u32;
     let option_len = core::mem::size_of::<u32>() as u32;
-
     let status = unsafe {
         setsockopt(
             fd,
@@ -140,9 +139,7 @@ pub fn start_server() -> Result<(), ServerError> {
 
     // 3. Bind to an address
     let sock_addr = SockAddr::new(domain::AF_INET as u8, 0, 1234);
-
     let status = unsafe { bind(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
-
     check_status!(status);
 
     // 4. listen for incoming connetctions
@@ -165,31 +162,38 @@ pub fn start_server() -> Result<(), ServerError> {
     }
 }
 
-fn buffered_read(fd: i32) -> Vec<u8> {
+fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
+    let mut left_to_read = expected_len;
     let mut full_buffer = vec![];
     let mut buffer = [0u8; 64];
-    loop {
+
+    while left_to_read > 0 {
+        let max_bytes_to_read = core::cmp::min(left_to_read, buffer.len());
         let bytes_read = unsafe {
             read(
                 fd,
                 buffer.as_mut_ptr() as *mut core::ffi::c_void,
-                buffer.len() as u32,
+                max_bytes_to_read as u32,
             )
         };
-        full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
         check_status!(bytes_read);
-
-        // We finished reading
-        if (bytes_read as usize) < buffer.len() {
-            return full_buffer;
-        }
+        left_to_read = left_to_read.saturating_sub(bytes_read as usize);
+        full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
     }
+    return full_buffer
 }
 
-fn read_and_respond(fd: i32) {
-    let buffer = buffered_read(fd);
+fn read_and_respond(fd: i32) -> Result<(), ReadError> {
+    // We preparea a dummy protocol, where each message is preceded by it's length under the form
+    // of a little endian 4-bytes unsigned integer.
+    // |     len | msg1     |       len | msg2 | ... |
+    // 0         4          len + 4
+    let buffer = read_full(fd, 4);
+    let buffer_len = usize::try_from(u32::from_le_bytes(buffer.get(0..4).ok_or(ReadError::InvalidRange)?.try_into()?))?;
 
-    println!("{}", String::from_utf8_lossy(&buffer));
+    let msg = read_full(fd, buffer_len);
+
+    println!("{}", String::from_utf8_lossy(&msg));
 
     let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
 
@@ -202,6 +206,8 @@ fn read_and_respond(fd: i32) {
     };
     check_status!(bytes_w);
     println!("Wrote {} bytes", bytes_w);
+
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -213,6 +219,27 @@ pub enum ServerError {
 pub enum ClientError {
     InvalidSocketHandle,
 }
+
+#[derive(Debug)]
+pub enum ReadError {
+    InvalidRange,
+    TryFromSliceError(std::array::TryFromSliceError),
+    TryFromIntError(std::num::TryFromIntError),
+}
+
+impl From<std::array::TryFromSliceError> for ReadError {
+    fn from(err: std::array::TryFromSliceError) -> Self {
+        Self::TryFromSliceError(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for ReadError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
+
+
 
 pub fn start_client() -> Result<(), ClientError> {
     // 1. Create socket
@@ -237,9 +264,9 @@ pub fn start_client() -> Result<(), ClientError> {
         )
     };
 
-    let buffer = buffered_read(fd);
+    //let buffer = read_full(fd);
 
-    println!("{}", String::from_utf8_lossy(&buffer));
+    //println!("{}", String::from_utf8_lossy(&buffer));
     unsafe { close(fd) };
     Ok(())
 }
