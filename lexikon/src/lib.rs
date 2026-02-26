@@ -89,7 +89,7 @@ macro_rules! check_status {
 // sockaddr as defined by the xnu kernel, which has a bit of a different layout overall, however
 // it does keep compatibility with the historical UNIX sockaddr_in
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct SockAddr {
     sa_len: u8,
     sa_family: u8,
@@ -157,6 +157,7 @@ pub fn start_server() -> Result<(), ServerError> {
         let conn_fd = unsafe { accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
 
         check_status!(conn_fd);
+        println!("Client sock addr: {:?}", client_sock_addr);
 
         read_and_respond(conn_fd);
         let status = unsafe { close(conn_fd) };
