@@ -295,17 +295,11 @@ pub fn start_client() -> Result<(), ClientError> {
     check_status!(status);
 
     let msg = String::from("hello");
-    let _bytes_w = unsafe {
-        write(
-            fd,
-            msg.as_ptr() as *const core::ffi::c_void,
-            msg.len() as u32,
-        )
-    };
+    let bytes_written = write_msg(fd, msg.as_bytes()).unwrap();
 
-    //let buffer = read_full(fd);
+    let buffer = read_msg(fd).unwrap();
 
-    //println!("{}", String::from_utf8_lossy(&buffer));
+    println!("{}", String::from_utf8_lossy(&buffer));
     unsafe { close(fd) };
     Ok(())
 }
