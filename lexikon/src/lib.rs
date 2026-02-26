@@ -162,20 +162,25 @@ pub fn start_server() -> Result<(), ServerError> {
     }
 }
 
-fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError>{
+fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
     // We preparea a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
     // TODO: We should check the buffer that we read
     let buffer = read_full(fd, 4);
-    let buffer_len = usize::try_from(u32::from_le_bytes(buffer.get(0..4).ok_or(ReadError::InvalidRange(0, 4))?.try_into()?))?;
+    let buffer_len = usize::try_from(u32::from_le_bytes(
+        buffer
+            .get(0..4)
+            .ok_or(ReadError::InvalidRange(0, 4))?
+            .try_into()?,
+    ))?;
 
     let msg = read_full(fd, buffer_len);
     Ok(msg)
 }
 
-fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError>{
+fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError> {
     // We preparea a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
@@ -207,7 +212,7 @@ fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
         left_to_read = left_to_read.saturating_sub(bytes_read as usize);
         full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
     }
-    return full_buffer
+    return full_buffer;
 }
 
 fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
@@ -220,7 +225,9 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
     while end < buffer.len() {
         end = start + window_write_len;
         end = core::cmp::min(end, buffer.len());
-        let slice = buffer.get(start..end).ok_or(WriteError::InvalidRange(start, end))?;
+        let slice = buffer
+            .get(start..end)
+            .ok_or(WriteError::InvalidRange(start, end))?;
         let bytes_written = unsafe {
             write(
                 fd,
@@ -280,7 +287,6 @@ impl From<std::num::TryFromIntError> for ReadError {
 pub enum WriteError {
     InvalidRange(usize, usize),
 }
-
 
 pub fn start_client() -> Result<(), ClientError> {
     // 1. Create socket
