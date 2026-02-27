@@ -87,7 +87,9 @@ macro_rules! check_status {
 }
 
 // sockaddr as defined by the xnu kernel, which has a bit of a different layout overall, however
-// it does keep compatibility with the historical UNIX sockaddr_in
+// it does keep compatibility with the historical UNIX sockaddr_in.
+// Any change in the layout and or size of this structure should take into account that it's length
+// cannot ever exceed a u8 -> 256 bytes in size
 #[repr(C)]
 #[derive(Default, Debug)]
 struct SockAddr {
@@ -125,7 +127,7 @@ pub fn start_server() -> Result<(), ServerError> {
 
     // 2. Set socket reuse address option to 1
     let mut option_value = 1u32;
-    let option_len = core::mem::size_of::<u32>() as u32;
+    let option_len = u32::try_from(core::mem::size_of::<u32>())?;
     let status = unsafe {
         setsockopt(
             fd,
@@ -138,8 +140,14 @@ pub fn start_server() -> Result<(), ServerError> {
     check_status!(status);
 
     // 3. Bind to an address
-    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0, 1234);
-    let status = unsafe { bind(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
+    let sock_addr = SockAddr::new(u8::try_from(domain::AF_INET)?, 0, 1234);
+    let status = unsafe {
+        bind(
+            fd,
+            &sock_addr,
+            u32::try_from(core::mem::size_of::<SockAddr>())?,
+        )
+    };
     check_status!(status);
 
     // 4. listen for incoming connetctions
@@ -149,7 +157,7 @@ pub fn start_server() -> Result<(), ServerError> {
     // 5. Accept incoming connections
     loop {
         let mut client_sock_addr = SockAddr::default();
-        let mut sock_addr_len: u32 = core::mem::size_of::<SockAddr>() as u32;
+        let mut sock_addr_len: u32 = u32::try_from(core::mem::size_of::<SockAddr>())?;
 
         let conn_fd = unsafe { accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
 
@@ -168,7 +176,7 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
     // TODO: We should check the buffer that we read
-    let buffer = read_full(fd, 4);
+    let buffer = read_full(fd, 4)?;
     let buffer_len = usize::try_from(u32::from_le_bytes(
         buffer
             .get(0..4)
@@ -176,8 +184,7 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
             .try_into()?,
     ))?;
 
-    let msg = read_full(fd, buffer_len);
-    Ok(msg)
+    read_full(fd, buffer_len)
 }
 
 fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError> {
@@ -185,14 +192,14 @@ fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError> {
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
-    let write_buffer_len = (write_buffer.len() as u32).to_le_bytes();
+    let write_buffer_len = u32::try_from(write_buffer.len())?.to_le_bytes();
     let mut bytes_written = write_full(fd, &write_buffer_len)?;
     bytes_written += write_full(fd, write_buffer)?;
 
     Ok(bytes_written)
 }
 
-fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
+fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
     let mut left_to_read = expected_len;
     let mut full_buffer = vec![];
     let mut buffer = [0u8; 64];
@@ -204,15 +211,20 @@ fn read_full(fd: i32, expected_len: usize) -> Vec<u8> {
             read(
                 fd,
                 buffer.as_mut_ptr() as *mut core::ffi::c_void,
-                max_bytes_to_read as u32,
+                u32::try_from(max_bytes_to_read)?,
             )
         };
         check_status!(bytes_read);
         println!("Bytes read {:?}", bytes_read);
-        left_to_read = left_to_read.saturating_sub(bytes_read as usize);
-        full_buffer.extend_from_slice(&buffer[0..bytes_read as usize]);
+        let bytes_read = usize::try_from(bytes_read)?;
+        left_to_read = left_to_read.saturating_sub(bytes_read);
+        full_buffer.extend_from_slice(
+            &buffer
+                .get(0..bytes_read)
+                .ok_or(ReadError::InvalidRange(0, bytes_read))?,
+        );
     }
-    return full_buffer;
+    Ok(full_buffer)
 }
 
 fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
@@ -232,7 +244,7 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
             write(
                 fd,
                 slice.as_ptr() as *const core::ffi::c_void,
-                slice.len() as u32,
+                u32::try_from(slice.len())?,
             )
         };
         check_status!(bytes_written);
@@ -259,6 +271,7 @@ pub enum ServerError {
     InvalidSocketHandle,
     ReadError(ReadError),
     WriteError(WriteError),
+    TryFromIntError(std::num::TryFromIntError),
 }
 
 #[derive(Debug)]
@@ -266,6 +279,7 @@ pub enum ClientError {
     InvalidSocketHandle,
     ReadError(ReadError),
     WriteError(WriteError),
+    TryFromIntError(std::num::TryFromIntError),
 }
 
 #[derive(Debug)]
@@ -282,6 +296,24 @@ impl From<std::array::TryFromSliceError> for ReadError {
 }
 
 impl From<std::num::TryFromIntError> for ReadError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for WriteError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for ServerError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for ClientError {
     fn from(err: std::num::TryFromIntError) -> Self {
         Self::TryFromIntError(err)
     }
@@ -314,6 +346,7 @@ impl From<WriteError> for ServerError {
 #[derive(Debug)]
 pub enum WriteError {
     InvalidRange(usize, usize),
+    TryFromIntError(std::num::TryFromIntError),
 }
 
 pub fn start_client() -> Result<(), ClientError> {
@@ -325,9 +358,15 @@ pub fn start_client() -> Result<(), ClientError> {
     }
 
     // 2. Connect to the loopback address -> 127.0.0.1
-    let sock_addr = SockAddr::new(domain::AF_INET as u8, 0x7f000001, 1234);
+    let sock_addr = SockAddr::new(u8::try_from(domain::AF_INET)?, 0x7f000001, 1234);
 
-    let status = unsafe { connect(fd, &sock_addr, core::mem::size_of::<SockAddr>() as u32) };
+    let status = unsafe {
+        connect(
+            fd,
+            &sock_addr,
+            u32::try_from(core::mem::size_of::<SockAddr>())?,
+        )
+    };
     check_status!(status);
 
     let msg = String::from("hello");
