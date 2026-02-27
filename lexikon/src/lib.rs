@@ -1,3 +1,5 @@
+mod event_loop;
+
 unsafe extern "C" {
     fn socket(domain: i32, t_type: i32, protocol: i32) -> i32;
     // option_len is a value-result parameter, initially containing the size of the buffer pointed
@@ -73,6 +75,7 @@ mod socket_option {
 // Maximum queue length specifiable for a `listen` call on XNU
 pub(crate) const SOMAXCONN: u32 = 128;
 
+#[macro_export]
 macro_rules! check_status {
     ($status:expr) => {
         if $status == -1 {
