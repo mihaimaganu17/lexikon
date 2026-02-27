@@ -231,6 +231,8 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
         check_status!(bytes_read);
         let bytes_read = usize::try_from(bytes_read)?;
         // TODO: Should we pace this based on number of pulls?
+        // read can also be interrupted by a signal because it must wait if the buffer is empty.
+        // In this case, 0 bytes are read, but the return value is -1 and errno is EINTR.
         if bytes_read == 0 {
             return Ok(full_buffer);
         }
