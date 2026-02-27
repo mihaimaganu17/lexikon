@@ -8,8 +8,9 @@ unsafe extern "C" {
     // certain events have occurred on them.  The fds argument is a pointer to an array of pollfd
     // structures, as defined in ⟨poll.h⟩ (shown below).  The nfds argument specifies the size of
     // the fds array.
-    fn poll(fds: &mut [PollFd], nfds: u32, timeout: i32) -> i32;
-    // Should also define `kqueue` which is used for real projects in BSD
+    fn poll(fds: &mut PollFd, nfds: u32, timeout: i32) -> i32;
+    // Note: Should also define `kqueue` which is used for real projects in BSD
+    // Note: For file IO within an event loop, we should use io_uring
 }
 
 mod cmd {
@@ -29,16 +30,12 @@ mod fd_flags {
 
 // TODO: Handle errors from flags
 fn set_nonblock(fd: i32) {
-    let mut flags = unsafe {
-        fcntl(fd, cmd::F_GETFL, 0)
-    };
+    let mut flags = unsafe { fcntl(fd, cmd::F_GETFL, 0) };
 
     crate::check_status!(flags);
     println!("{:#?}", flags);
     flags |= fd_flags::O_NONBLOCK;
-    let status = unsafe {
-        fcntl(fd, cmd::F_SETFL, flags)
-    };
+    let status = unsafe { fcntl(fd, cmd::F_SETFL, flags) };
     crate::check_status!(status);
 }
 
@@ -50,11 +47,12 @@ mod poll_flags {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 struct PollFd {
     // File descriptor to poll
     fd: u32,
     // Events to look for
-    events: u32,
+    events: u16,
     // Events returned, which may occure or have occured.
-    revents: u32,
+    revents: u16,
 }
