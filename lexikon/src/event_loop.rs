@@ -4,6 +4,12 @@ unsafe extern "C" {
     // arguments, but for our purposes, we only need 1 argument because we only want to set the
     // flags with F_SETFL and F_GETFL. In the case of F_GETFL, the `value` argument is ignored.
     fn fcntl(filedes: i32, cmd: i32, value: i32) -> i32;
+    // poll() examines a set of file descriptors to see if some of them are ready for I/O or if
+    // certain events have occurred on them.  The fds argument is a pointer to an array of pollfd
+    // structures, as defined in ⟨poll.h⟩ (shown below).  The nfds argument specifies the size of
+    // the fds array.
+    fn poll(fds: &mut [PollFd], nfds: u32, timeout: i32) -> i32;
+    // Should also define `kqueue` which is used for real projects in BSD
 }
 
 mod cmd {
@@ -34,4 +40,21 @@ fn set_nonblock(fd: i32) {
         fcntl(fd, cmd::F_SETFL, flags)
     };
     crate::check_status!(status);
+}
+
+mod poll_flags {
+    // Any readable data available
+    pub const POLLIN: u16 = 0x0001;
+    // File descriptor is writable
+    pub const POLLOUT: u16 = 0x0004;
+}
+
+#[derive(Debug)]
+struct PollFd {
+    // File descriptor to poll
+    fd: u32,
+    // Events to look for
+    events: u32,
+    // Events returned, which may occure or have occured.
+    revents: u32,
 }
