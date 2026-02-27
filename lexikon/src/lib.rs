@@ -164,7 +164,7 @@ pub fn start_server() -> Result<(), ServerError> {
         check_status!(conn_fd);
         println!("Client sock addr: {:?}", client_sock_addr);
 
-        read_and_respond(conn_fd);
+        read_and_respond(conn_fd)?;
         let status = unsafe { close(conn_fd) };
         check_status!(status);
     }
@@ -219,7 +219,7 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
         let bytes_read = usize::try_from(bytes_read)?;
         left_to_read = left_to_read.saturating_sub(bytes_read);
         full_buffer.extend_from_slice(
-            &buffer
+            buffer
                 .get(0..bytes_read)
                 .ok_or(ReadError::InvalidRange(0, bytes_read))?,
         );
@@ -228,7 +228,6 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
 }
 
 fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
-    let mut left_to_write = buffer.len();
     // How many bytes to write per each write call
     let window_write_len = 64usize;
     let mut start = 0;
@@ -370,7 +369,7 @@ pub fn start_client() -> Result<(), ClientError> {
     check_status!(status);
 
     let msg = String::from("hello");
-    let bytes_written = write_msg(fd, msg.as_bytes())?;
+    let _bytes_written = write_msg(fd, msg.as_bytes())?;
 
     let buffer = read_msg(fd)?;
 
