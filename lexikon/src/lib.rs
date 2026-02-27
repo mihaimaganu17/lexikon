@@ -164,7 +164,19 @@ pub fn start_server() -> Result<(), ServerError> {
         check_status!(conn_fd);
         println!("Client sock addr: {:?}", client_sock_addr);
 
-        read_and_respond(conn_fd)?;
+        loop {
+            match read_and_respond(conn_fd) {
+                Ok(bytes_written) => {
+                    if bytes_written == 0 {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    println!("Client Error: {:?}", err);
+                    break;
+                }
+            }
+        }
         let status = unsafe { close(conn_fd) };
         check_status!(status);
     }
@@ -177,6 +189,9 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
     // 0         4          len + 4
     // TODO: We should check the buffer that we read
     let buffer = read_full(fd, 4)?;
+    if buffer.len() == 0 {
+        return Ok(buffer);
+    }
     let buffer_len = usize::try_from(u32::from_le_bytes(
         buffer
             .get(0..4)
@@ -206,7 +221,6 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
 
     while left_to_read > 0 {
         let max_bytes_to_read = core::cmp::min(left_to_read, buffer.len());
-        println!("{:#?}", max_bytes_to_read);
         let bytes_read = unsafe {
             read(
                 fd,
@@ -215,8 +229,11 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
             )
         };
         check_status!(bytes_read);
-        println!("Bytes read {:?}", bytes_read);
         let bytes_read = usize::try_from(bytes_read)?;
+        // TODO: Should we pace this based on number of pulls?
+        if bytes_read == 0 {
+            return Ok(full_buffer);
+        }
         left_to_read = left_to_read.saturating_sub(bytes_read);
         full_buffer.extend_from_slice(
             buffer
@@ -252,9 +269,12 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
     Ok(end)
 }
 
-fn read_and_respond(fd: i32) -> Result<(), ServerError> {
+fn read_and_respond(fd: i32) -> Result<usize, ServerError> {
     // 1. Read client message
     let msg = read_msg(fd)?;
+    if msg.len() == 0 {
+        return Ok(0);
+    }
     println!("{}", String::from_utf8_lossy(&msg));
 
     // 2. Write message back to client
@@ -262,7 +282,7 @@ fn read_and_respond(fd: i32) -> Result<(), ServerError> {
     let bytes_written = write_msg(fd, write_buffer.as_bytes())?;
     println!("Wrote {} bytes", bytes_written);
 
-    Ok(())
+    Ok(bytes_written)
 }
 
 #[derive(Debug)]
@@ -283,6 +303,7 @@ pub enum ClientError {
 
 #[derive(Debug)]
 pub enum ReadError {
+    NoMessage,
     InvalidRange(usize, usize),
     TryFromSliceError(std::array::TryFromSliceError),
     TryFromIntError(std::num::TryFromIntError),
@@ -368,12 +389,16 @@ pub fn start_client() -> Result<(), ClientError> {
     };
     check_status!(status);
 
-    let msg = String::from("hello");
+    let msg = String::from("Good morning!");
     let _bytes_written = write_msg(fd, msg.as_bytes())?;
-
     let buffer = read_msg(fd)?;
-
     println!("{}", String::from_utf8_lossy(&buffer));
+
+    let msg = "How are you?";
+    let _bytes_written = write_msg(fd, msg.as_bytes())?;
+    let buffer = read_msg(fd)?;
+    println!("{}", String::from_utf8_lossy(&buffer));
+
     unsafe { close(fd) };
     Ok(())
 }
