@@ -189,7 +189,7 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
     // 0         4          len + 4
     // TODO: We should check the buffer that we read
     let buffer = read_full(fd, 4)?;
-    if buffer.len() == 0 {
+    if buffer.is_empty() {
         return Ok(buffer);
     }
     let buffer_len = usize::try_from(u32::from_le_bytes(
@@ -272,7 +272,7 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
 fn read_and_respond(fd: i32) -> Result<usize, ServerError> {
     // 1. Read client message
     let msg = read_msg(fd)?;
-    if msg.len() == 0 {
+    if msg.is_empty() {
         return Ok(0);
     }
     println!("{}", String::from_utf8_lossy(&msg));
