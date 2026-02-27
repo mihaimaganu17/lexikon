@@ -243,12 +243,12 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
 
 fn read_and_respond(fd: i32) -> Result<(), ServerError> {
     // 1. Read client message
-    let msg = read_msg(fd).unwrap();
+    let msg = read_msg(fd)?;
     println!("{}", String::from_utf8_lossy(&msg));
 
     // 2. Write message back to client
     let write_buffer = String::from("HTTP/1.1 200 OK\n\nhello");
-    let bytes_written = write_msg(fd, write_buffer.as_bytes()).unwrap();
+    let bytes_written = write_msg(fd, write_buffer.as_bytes())?;
     println!("Wrote {} bytes", bytes_written);
 
     Ok(())
@@ -257,11 +257,15 @@ fn read_and_respond(fd: i32) -> Result<(), ServerError> {
 #[derive(Debug)]
 pub enum ServerError {
     InvalidSocketHandle,
+    ReadError(ReadError),
+    WriteError(WriteError),
 }
 
 #[derive(Debug)]
 pub enum ClientError {
     InvalidSocketHandle,
+    ReadError(ReadError),
+    WriteError(WriteError),
 }
 
 #[derive(Debug)]
@@ -280,6 +284,30 @@ impl From<std::array::TryFromSliceError> for ReadError {
 impl From<std::num::TryFromIntError> for ReadError {
     fn from(err: std::num::TryFromIntError) -> Self {
         Self::TryFromIntError(err)
+    }
+}
+
+impl From<ReadError> for ClientError {
+    fn from(err: ReadError) -> Self {
+        Self::ReadError(err)
+    }
+}
+
+impl From<ReadError> for ServerError {
+    fn from(err: ReadError) -> Self {
+        Self::ReadError(err)
+    }
+}
+
+impl From<WriteError> for ClientError {
+    fn from(err: WriteError) -> Self {
+        Self::WriteError(err)
+    }
+}
+
+impl From<WriteError> for ServerError {
+    fn from(err: WriteError) -> Self {
+        Self::WriteError(err)
     }
 }
 
@@ -303,9 +331,9 @@ pub fn start_client() -> Result<(), ClientError> {
     check_status!(status);
 
     let msg = String::from("hello");
-    let bytes_written = write_msg(fd, msg.as_bytes()).unwrap();
+    let bytes_written = write_msg(fd, msg.as_bytes())?;
 
-    let buffer = read_msg(fd).unwrap();
+    let buffer = read_msg(fd)?;
 
     println!("{}", String::from_utf8_lossy(&buffer));
     unsafe { close(fd) };
