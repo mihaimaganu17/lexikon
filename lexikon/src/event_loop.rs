@@ -1,3 +1,5 @@
+use crate::ServerError;
+
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
     // descriptor to be operated on by cmd. In particular, the C version supports variadic
@@ -90,6 +92,7 @@ impl PollFd {
 }
 
 // Represents per-connection state of a socket used by the event loop of  the application
+#[derive(Default)]
 struct Conn {
     fd: i32,
     // Application's intention, for the event loop
@@ -126,7 +129,8 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
         poll_args.clear();
 
         // TODO: Check fd is not -1
-        // Put the listening (reading) sockets in the first position
+        // Put the listening sockets in the first position. This is the socket that we bind to our
+        // server uses to accept new connections.
         let poll_read = PollFd::new(fd as u32, POLLIN, 0);
         poll_args.push(poll_read);
         // The rest are connection sockets
@@ -147,15 +151,16 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
             poll_args.push(poll_fd);
         }
 
-        // wait for readiness
+        // 2. Wait for file descriptor readiness using `poll` syscall
         // TODO: Maybe we can try a timeout and retry afterwards.
         let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len() as u32, -1) };
 
         match crate::check_status(poll_status) {
             Ok(_ready_fds) => {},
             Err(err) => {
-                // If this syscall was interrupted, this is not an error and we would like to retry
-                // it
+                // If this syscall was interrupted, it was due to a Unix signal. This is not an
+                // error, but rather a way for the OS to let us know the syscall was interrupted.
+                // In this case we would like to retry it.
                 if err.kind() == std::io::ErrorKind::Interrupted {
                     continue;
                 } else {
@@ -163,5 +168,22 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
                 }
             }
         }
+
+        // 3. Handle the listening socket
+        // If the listening socket returns, we are ready to accept new connection as the server
+        // TODO: make this safe. get(0) and check for errors
+        if poll_args[0].revents != 0 {
+            println!("{:x}", poll_args[0].revents);
+            // 
+            if let Ok(conn) = handle_accept(fd) {
+                // Put it in the map
+                fd2conn.push(Some(conn));
+            }
+        }
     }
+}
+
+fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
+    let conn = Conn { fd: -1, ..Conn::default() };
+    Ok(conn)
 }
