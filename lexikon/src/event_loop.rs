@@ -1,4 +1,5 @@
 use crate::ServerError;
+use crate::close;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -186,12 +187,23 @@ fn run_app(fd: i32) -> Result<(), ServerError> {
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
             // TODO: make it safe -> get and try_from
-            if let Some(conn) = &fd2conn[poll_fd.fd as usize] {
+            let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
+
+            if let Some(conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
                     handle_read(&conn)?;
                 }
                 if poll_fd.revents & POLLOUT != 0 {
                     handle_write(&conn)?;
+                }
+                // Close the socket or error or based on application request if it wants to close
+                // the connection.
+                if (poll_fd.revents & POLLERR != 0) || conn.want_close {
+                    let status = unsafe { close(conn.fd) };
+                    // TODO: These should be logged to avoid crashing the whole application.
+                    crate::check_status(status)?;
+                } else {
+                    fd2conn[poll_fd.fd as usize].replace(conn);
                 }
             }
         }
