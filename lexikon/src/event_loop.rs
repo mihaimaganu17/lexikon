@@ -28,15 +28,15 @@ mod fd_flags {
     pub const O_NONBLOCK: i32 = 0x0000_0004;
 }
 
-// TODO: Handle errors from flags
-fn set_nonblock(fd: i32) {
+fn set_nonblock(fd: i32) -> Result<(), std::io::Error> {
     let mut flags = unsafe { fcntl(fd, cmd::F_GETFL, 0) };
 
-    crate::check_status!(flags);
+    crate::check_status(flags)?;
     println!("{:#?}", flags);
     flags |= fd_flags::O_NONBLOCK;
     let status = unsafe { fcntl(fd, cmd::F_SETFL, flags) };
-    crate::check_status!(status);
+    crate::check_status(status)?;
+    Ok(())
 }
 
 mod poll_flags {

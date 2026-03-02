@@ -75,18 +75,13 @@ mod socket_option {
 // Maximum queue length specifiable for a `listen` call on XNU
 pub(crate) const SOMAXCONN: u32 = 128;
 
-#[macro_export]
-macro_rules! check_status {
-    ($status:expr) => {
-        if $status == -1 {
-            // Should this be a return?
-            println!(
-                "Status {:?} -> {:?}",
-                $status,
-                std::io::Error::last_os_error()
-            );
-        }
-    };
+fn check_status(status: i32) -> Result<(), std::io::Error> {
+    if status == -1 {
+        // Should this be a return?
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 // sockaddr as defined by the xnu kernel, which has a bit of a different layout overall, however
@@ -140,7 +135,7 @@ pub fn start_server() -> Result<(), ServerError> {
             option_len,
         )
     };
-    check_status!(status);
+    check_status(status)?;
 
     // 3. Bind to an address
     let sock_addr = SockAddr::new(u8::try_from(domain::AF_INET)?, 0, 1234);
@@ -151,11 +146,11 @@ pub fn start_server() -> Result<(), ServerError> {
             u32::try_from(core::mem::size_of::<SockAddr>())?,
         )
     };
-    check_status!(status);
+    check_status(status)?;
 
     // 4. listen for incoming connetctions
     let status = unsafe { listen(fd, SOMAXCONN) };
-    check_status!(status);
+    check_status(status)?;
 
     // 5. Accept incoming connections
     loop {
@@ -164,7 +159,7 @@ pub fn start_server() -> Result<(), ServerError> {
 
         let conn_fd = unsafe { accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
 
-        check_status!(conn_fd);
+        check_status(conn_fd)?;
         println!("Client sock addr: {:?}", client_sock_addr);
 
         loop {
@@ -181,7 +176,7 @@ pub fn start_server() -> Result<(), ServerError> {
             }
         }
         let status = unsafe { close(conn_fd) };
-        check_status!(status);
+        check_status(status)?;
     }
 }
 
@@ -231,7 +226,7 @@ fn read_full(fd: i32, expected_len: usize) -> Result<Vec<u8>, ReadError> {
                 u32::try_from(max_bytes_to_read)?,
             )
         };
-        check_status!(bytes_read);
+        check_status(bytes_read)?;
         let bytes_read = usize::try_from(bytes_read)?;
         // TODO: Should we pace this based on number of pulls?
         // read can also be interrupted by a signal because it must wait if the buffer is empty.
@@ -268,7 +263,7 @@ fn write_full(fd: i32, buffer: &[u8]) -> Result<usize, WriteError> {
                 u32::try_from(slice.len())?,
             )
         };
-        check_status!(bytes_written);
+        check_status(bytes_written)?;
         start = end;
     }
     Ok(end)
@@ -295,6 +290,7 @@ pub enum ServerError {
     InvalidSocketHandle,
     ReadError(ReadError),
     WriteError(WriteError),
+    StdIOError(std::io::Error),
     TryFromIntError(std::num::TryFromIntError),
 }
 
@@ -303,6 +299,7 @@ pub enum ClientError {
     InvalidSocketHandle,
     ReadError(ReadError),
     WriteError(WriteError),
+    StdIOError(std::io::Error),
     TryFromIntError(std::num::TryFromIntError),
 }
 
@@ -310,6 +307,7 @@ pub enum ClientError {
 pub enum ReadError {
     NoMessage,
     InvalidRange(usize, usize),
+    StdIOError(std::io::Error),
     TryFromSliceError(std::array::TryFromSliceError),
     TryFromIntError(std::num::TryFromIntError),
 }
@@ -344,6 +342,30 @@ impl From<std::num::TryFromIntError> for ClientError {
     }
 }
 
+impl From<std::io::Error> for ReadError {
+    fn from(err: std::io::Error) -> Self {
+        Self::StdIOError(err)
+    }
+}
+
+impl From<std::io::Error> for WriteError {
+    fn from(err: std::io::Error) -> Self {
+        Self::StdIOError(err)
+    }
+}
+
+impl From<std::io::Error> for ServerError {
+    fn from(err: std::io::Error) -> Self {
+        Self::StdIOError(err)
+    }
+}
+
+impl From<std::io::Error> for ClientError {
+    fn from(err: std::io::Error) -> Self {
+        Self::StdIOError(err)
+    }
+}
+
 impl From<ReadError> for ClientError {
     fn from(err: ReadError) -> Self {
         Self::ReadError(err)
@@ -370,6 +392,7 @@ impl From<WriteError> for ServerError {
 
 #[derive(Debug)]
 pub enum WriteError {
+    StdIOError(std::io::Error),
     InvalidRange(usize, usize),
     TryFromIntError(std::num::TryFromIntError),
 }
@@ -392,7 +415,7 @@ pub fn start_client() -> Result<(), ClientError> {
             u32::try_from(core::mem::size_of::<SockAddr>())?,
         )
     };
-    check_status!(status);
+    check_status(status)?;
 
     let msg = String::from("Good morning!");
     let _bytes_written = write_msg(fd, msg.as_bytes())?;
