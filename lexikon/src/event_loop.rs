@@ -1,6 +1,8 @@
 use crate::ServerError;
 use crate::SockAddr;
 use crate::close;
+use crate::read;
+use crate::ReadError;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -195,9 +197,9 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
             // TODO: make it safe -> get and try_from
             let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
 
-            if let Some(conn) = maybe_conn {
+            if let Some(mut conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
-                    handle_read(&conn)?;
+                    handle_read(&mut conn)?;
                 }
                 if poll_fd.revents & POLLOUT != 0 {
                     handle_write(&conn)?;
@@ -239,7 +241,24 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
     Ok(conn)
 }
 
-fn handle_read(conn: &Conn) -> Result<(), ServerError> {
+fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
+    // Is the size too much? Should we tone it down?
+
+    // 1. Do a non-blocking read.
+    let mut buf = [0; 64 * 1024];
+    let bread = unsafe {
+        read(conn.fd, buf.as_mut_ptr() as *mut core::ffi::c_void, u32::try_from(buf.len())?)
+    };
+
+    if bread <= 0 {
+        conn.want_close = true;
+        return Ok(());
+    }
+    let bread = usize::try_from(bread)?;
+
+    // 2. Add new data to the `incoming` buffer.
+    conn.incoming.extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
+
     Ok(())
 }
 
