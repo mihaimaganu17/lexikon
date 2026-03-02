@@ -3,6 +3,7 @@ use crate::ServerError;
 use crate::SockAddr;
 use crate::close;
 use crate::read;
+use crate::write;
 
 // Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
 const MAX_KERNEL_PIPE_SIZE: usize = 64 * 1024;
@@ -205,7 +206,7 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
                     handle_read(&mut conn)?;
                 }
                 if poll_fd.revents & POLLOUT != 0 {
-                    handle_write(&conn)?;
+                    handle_write(&mut conn)?;
                 }
                 // Close the socket or error or based on application request if it wants to close
                 // the connection.
@@ -305,10 +306,28 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
     println!("{}", String::from_utf8_lossy(&message));
     // Clear the buffer for the next message
-    conn.incoming.clear();
+    conn.incoming = conn.incoming.split_off(message_end);
     Ok(true)
 }
 
-fn handle_write(conn: &Conn) -> Result<(), ServerError> {
+fn handle_write(conn: &mut Conn) -> Result<(), ServerError> {
+    // Check we have contents in the buffer
+    if conn.outgoing.len() == 0 {
+        return Ok(());
+    }
+    let bwritten = unsafe {
+        write(
+            conn.fd,
+            conn.outgoing.as_ptr() as *const core::ffi::c_void,
+            u32::try_from(conn.outgoing.len())?,
+        )
+    };
+    // Protocol error
+    if bwritten < 0 {
+        conn.want_close = true;
+        return Ok(());
+    }
+
+    conn.outgoing = conn.outgoing.split_off(usize::try_from(bwritten)?);
     Ok(())
 }
