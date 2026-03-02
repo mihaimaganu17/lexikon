@@ -12,7 +12,12 @@ unsafe extern "C" {
     // If timeout is greater than zero, it specifies a maximum interval (in milliseconds) to wait
     // for any file descriptor to become ready.  If timeout is zero, then poll() will return
     // without blocking. If the value of timeout is -1, the poll blocks indefinitely.
-    fn poll(fds: &mut PollFd, nfds: u32, timeout: i32) -> i32;
+    //
+    // poll() returns the number of descriptors that are ready for I/O, or -1 if an error occurred.
+    // If the time limit expires, poll() returns 0.  If poll() returns with an error, including one
+    // due to an interrupted call, the fds array will be unmodified and the global variable errno
+    // will be set to indicate the error
+    fn poll(fds: *mut PollFd, nfds: u32, timeout: i32) -> i32;
     // Note: Should also define `kqueue` which is used for real projects in BSD
     // Note: For file IO within an event loop, we should use io_uring
 }
@@ -105,7 +110,7 @@ struct Conn {
     outgoing: Vec<u8>,
 }
 
-fn run_app(fd: i32) {
+fn run_app(fd: i32) -> Result<(), std::io::Error> {
     use poll_flags::*;
     // 1. Construct the `fd` list for `poll` function to use
 
@@ -140,6 +145,23 @@ fn run_app(fd: i32) {
                 poll_fd.events |= POLLOUT;
             }
             poll_args.push(poll_fd);
+        }
+
+        // wait for readiness
+        // TODO: Maybe we can try a timeout and retry afterwards.
+        let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len() as u32, -1) };
+
+        match crate::check_status(poll_status) {
+            Ok(_ready_fds) => {},
+            Err(err) => {
+                // If this syscall was interrupted, this is not an error and we would like to retry
+                // it
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                } else {
+                    return Err(err);
+                }
+            }
         }
     }
 }
