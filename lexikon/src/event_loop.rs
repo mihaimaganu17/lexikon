@@ -113,7 +113,7 @@ struct Conn {
     outgoing: Vec<u8>,
 }
 
-fn run_app(fd: i32) -> Result<(), std::io::Error> {
+fn run_app(fd: i32) -> Result<(), ServerError> {
     use poll_flags::*;
     // 1. Construct the `fd` list for `poll` function to use
 
@@ -164,7 +164,7 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
                 if err.kind() == std::io::ErrorKind::Interrupted {
                     continue;
                 } else {
-                    return Err(err);
+                    return Err(ServerError::StdIOError(err));
                 }
             }
         }
@@ -173,7 +173,7 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
         // If the listening socket returns, we are ready to accept new connection as the server.
         // accept is treated as read in readiness notifications.
         // TODO: make this safe. get(0) and check for errors
-        if poll_args[0].revents | POLLIN != 0 {
+        if poll_args[0].revents & POLLIN != 0 {
             // 
             if let Ok(conn) = handle_accept(fd) {
                 // Put it in the map
@@ -182,10 +182,31 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
         } else {
             println!("{:x}", poll_args[0].revents);
         }
+
+        // 4. Handle connection sockets. Sockets which are already connected from other clients
+        for poll_fd in poll_args.iter().skip(1) {
+            // TODO: make it safe -> get and try_from
+            if let Some(conn) = &fd2conn[poll_fd.fd as usize] {
+                if poll_fd.revents & POLLIN != 0 {
+                    handle_read(&conn)?;
+                }
+                if poll_fd.revents & POLLOUT != 0 {
+                    handle_write(&conn)?;
+                }
+            }
+        }
     }
 }
 
 fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
     let conn = Conn { fd: -1, ..Conn::default() };
     Ok(conn)
+}
+
+fn handle_read(conn: &Conn) -> Result<(), ServerError> {
+    Ok(())
+}
+
+fn handle_write(conn: &Conn) -> Result<(), ServerError> {
+    Ok(())
 }
