@@ -1,8 +1,8 @@
+use crate::ReadError;
 use crate::ServerError;
 use crate::SockAddr;
 use crate::close;
 use crate::read;
-use crate::ReadError;
 
 // Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
 const MAX_KERNEL_PIPE_SIZE: usize = 64 * 1024;
@@ -250,7 +250,11 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // 1. Do a non-blocking read.
     let mut buf = [0; MAX_KERNEL_PIPE_SIZE];
     let bread = unsafe {
-        read(conn.fd, buf.as_mut_ptr() as *mut core::ffi::c_void, u32::try_from(buf.len())?)
+        read(
+            conn.fd,
+            buf.as_mut_ptr() as *mut core::ffi::c_void,
+            u32::try_from(buf.len())?,
+        )
     };
 
     if bread <= 0 {
@@ -260,7 +264,8 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     let bread = usize::try_from(bread)?;
 
     // 2. Add new data to the `incoming` buffer.
-    conn.incoming.extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
+    conn.incoming
+        .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
 
     Ok(())
 }
@@ -294,7 +299,10 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     }
 
     // 4. Process the parsed message
-    let message = conn.incoming.get(len_size..message_end).ok_or(ReadError::InvalidRange(len_size, message_end))?;
+    let message = conn
+        .incoming
+        .get(len_size..message_end)
+        .ok_or(ReadError::InvalidRange(len_size, message_end))?;
     println!("{}", String::from_utf8_lossy(&message));
     // Clear the buffer for the next message
     conn.incoming.clear();
