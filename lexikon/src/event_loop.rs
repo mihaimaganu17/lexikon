@@ -1,5 +1,6 @@
 use crate::ServerError;
 use crate::close;
+use crate::SockAddr;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -217,7 +218,20 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
 }
 
 fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
-    let conn = Conn { fd: -1, ..Conn::default() };
+    // Handling accept of an incoming connection to the listening socket
+    // TODO: Create a socket.rs module
+    let mut client_sock_addr = SockAddr::default();
+    let mut sock_addr_len: u32 = u32::try_from(core::mem::size_of::<SockAddr>())?;
+
+    let conn_fd = unsafe { crate::accept(fd, &mut client_sock_addr, &mut sock_addr_len) };
+
+    crate::check_status(conn_fd)?;
+    println!("Client sock addr: {:?}", client_sock_addr);
+    // Set the new connection fd to nonblocking mode
+    set_nonblock(conn_fd)?;
+
+    // Read the first request and return a connection state
+    let conn = Conn { fd: conn_fd, want_read: true, ..Conn::default() };
     Ok(conn)
 }
 
