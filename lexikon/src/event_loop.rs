@@ -76,7 +76,11 @@ struct PollFd {
 
 impl PollFd {
     pub fn new(fd: u32, events: u16, revents: u16) -> Self {
-        Self { fd, events, revents }
+        Self {
+            fd,
+            events,
+            revents,
+        }
     }
 }
 
@@ -139,4 +143,3 @@ fn run_app(fd: i32) {
         }
     }
 }
-
