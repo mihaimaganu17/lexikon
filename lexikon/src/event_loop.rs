@@ -305,6 +305,13 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .get(len_size..message_end)
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
     println!("{}", String::from_utf8_lossy(&message));
+    // TODO: Populate outgoing with a response
+
+    // Update the readiness intention
+    if conn.outgoing.len() > 0 {
+        conn.want_read = false;
+        conn.want_write = true;
+    }
     // Clear the buffer for the next message
     conn.incoming = conn.incoming.split_off(message_end);
     Ok(true)
@@ -329,5 +336,12 @@ fn handle_write(conn: &mut Conn) -> Result<(), ServerError> {
     }
 
     conn.outgoing = conn.outgoing.split_off(usize::try_from(bwritten)?);
+
+    // If all of the data is written, we want to read next. Otherwise, we keep the want to read
+    if conn.outgoing.len() == 0 {
+        conn.want_read = true;
+        conn.want_write = false;
+    }
+
     Ok(())
 }
