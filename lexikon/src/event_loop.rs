@@ -295,6 +295,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
 
     // 4. Process the parsed message
     let message = conn.incoming.get(len_size..message_end).ok_or(ReadError::InvalidRange(len_size, message_end))?;
+    println!("{}", String::from_utf8_lossy(&message));
     // Clear the buffer for the next message
     conn.incoming.clear();
     Ok(true)
