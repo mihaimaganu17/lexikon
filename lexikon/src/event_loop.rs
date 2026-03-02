@@ -65,11 +65,19 @@ mod poll_flags {
 struct PollFd {
     // File descriptor to poll
     fd: u32,
-    // Events to look for. Requests for wanting to read, write or both
+    // Events to look for. Requests for wanting to read, write or both.
+    // Note: Should we make this of type PollFlags?
     events: u16,
     // Events returned, which may occur or have occured. Uses the same set of flags to indicate
     // whether the `fd` is capable to `read` and / or `write`
+    // Note: Should we make this of type PollFlags?
     revents: u16,
+}
+
+impl PollFd {
+    pub fn new(fd: u32, events: u16, revents: u16) -> Self {
+        Self { fd, events, revents }
+    }
 }
 
 // Represents per-connection state of a socket used by the event loop of  the application
@@ -93,10 +101,42 @@ struct Conn {
     outgoing: Vec<u8>,
 }
 
-fn event_loop() {
+fn run_app(fd: i32) {
+    use poll_flags::*;
+    // 1. Construct the `fd` list for `poll` function to use
+
     // A map of all client connections, keyed by fd. An fd is allocated as the smallest available
     // non-negative integer, so the mapping from fd to the `Conn` state can be a flat array indexed
     // by fd.
-    let mut fd2conn: Vec<Conn> = vec![];
+    let mut fd2conn: Vec<Option<Conn>> = vec![];
+    // We want to construct this array in order to fill `poll` with it as an arg
+    let mut poll_args: Vec<PollFd> = vec![];
+
+    loop {
+        // Clear the arguments for poll
+        poll_args.clear();
+
+        // TODO: Check fd is not -1
+        // Put the listening (reading) sockets in the first position
+        let poll_read = PollFd::new(fd as u32, POLLIN, 0);
+        poll_args.push(poll_read);
+        // The rest are connection sockets
+        for maybe_conn in fd2conn.iter_mut() {
+            let Some(conn) = maybe_conn else {
+                continue;
+            };
+            // TODO: Check fd is not -1
+            let mut poll_fd = PollFd::new(conn.fd as u32, POLLERR, 0);
+
+            // poll() flags from the application's intent
+            if conn.want_read {
+                poll_fd.events |= POLLIN;
+            }
+            if conn.want_write {
+                poll_fd.events |= POLLOUT;
+            }
+            poll_args.push(poll_fd);
+        }
+    }
 }
 
