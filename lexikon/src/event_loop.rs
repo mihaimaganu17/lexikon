@@ -1,6 +1,6 @@
 use crate::ServerError;
-use crate::close;
 use crate::SockAddr;
+use crate::close;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -163,7 +163,7 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
         let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len() as u32, -1) };
 
         match crate::check_status(poll_status) {
-            Ok(_ready_fds) => {},
+            Ok(_ready_fds) => {}
             Err(err) => {
                 // If this syscall was interrupted, it was due to a Unix signal. This is not an
                 // error, but rather a way for the OS to let us know the syscall was interrupted.
@@ -181,7 +181,7 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
         // accept is treated as read in readiness notifications.
         // TODO: make this safe. get(0) and check for errors
         if poll_args[0].revents & POLLIN != 0 {
-            // 
+            //
             if let Ok(conn) = handle_accept(fd) {
                 // Put it in the map
                 fd2conn.push(Some(conn));
@@ -231,7 +231,11 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
     set_nonblock(conn_fd)?;
 
     // Read the first request and return a connection state
-    let conn = Conn { fd: conn_fd, want_read: true, ..Conn::default() };
+    let conn = Conn {
+        fd: conn_fd,
+        want_read: true,
+        ..Conn::default()
+    };
     Ok(conn)
 }
 
