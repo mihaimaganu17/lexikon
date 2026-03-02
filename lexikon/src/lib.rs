@@ -116,7 +116,7 @@ impl SockAddr {
     }
 }
 
-pub fn start_server() -> Result<(), ServerError> {
+fn setup_socket() -> Result<i32, ServerError> {
     // 1. Create socket
     let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
     if fd == -1 {
@@ -135,7 +135,7 @@ pub fn start_server() -> Result<(), ServerError> {
             option_len,
         )
     };
-    check_status(status)?;
+    crate::check_status(status)?;
 
     // 3. Bind to an address
     let sock_addr = SockAddr::new(u8::try_from(domain::AF_INET)?, 0, 1234);
@@ -146,11 +146,17 @@ pub fn start_server() -> Result<(), ServerError> {
             u32::try_from(core::mem::size_of::<SockAddr>())?,
         )
     };
-    check_status(status)?;
+    crate::check_status(status)?;
 
     // 4. listen for incoming connetctions
     let status = unsafe { listen(fd, SOMAXCONN) };
-    check_status(status)?;
+    crate::check_status(status)?;
+
+    Ok(fd)
+}
+
+pub fn start_server() -> Result<(), ServerError> {
+    let fd = setup_socket()?;
 
     // 5. Accept incoming connections
     loop {

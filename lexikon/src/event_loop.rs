@@ -114,7 +114,7 @@ struct Conn {
     outgoing: Vec<u8>,
 }
 
-fn run_app(fd: i32) -> Result<(), ServerError> {
+fn run_server(fd: i32) -> Result<(), ServerError> {
     use poll_flags::*;
     // 1. Construct the `fd` list for `poll` function to use
 
@@ -124,6 +124,11 @@ fn run_app(fd: i32) -> Result<(), ServerError> {
     let mut fd2conn: Vec<Option<Conn>> = vec![];
     // We want to construct this array in order to fill `poll` with it as an arg
     let mut poll_args: Vec<PollFd> = vec![];
+
+    // Create the listening socket for the server -> create, set it reuse, bind, listen
+    let fd = crate::setup_socket()?;
+    // Set the listening socket as non-blocking
+    set_nonblock(fd)?;
 
     loop {
         // Clear the arguments for poll
@@ -198,6 +203,7 @@ fn run_app(fd: i32) -> Result<(), ServerError> {
                 }
                 // Close the socket or error or based on application request if it wants to close
                 // the connection.
+                // TODO: In case of an error, create a `handle_err`
                 if (poll_fd.revents & POLLERR != 0) || conn.want_close {
                     let status = unsafe { close(conn.fd) };
                     // TODO: These should be logged to avoid crashing the whole application.
