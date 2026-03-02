@@ -4,6 +4,9 @@ use crate::close;
 use crate::read;
 use crate::ReadError;
 
+// Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
+const MAX_KERNEL_PIPE_SIZE: usize = 64 * 1024;
+
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
     // descriptor to be operated on by cmd. In particular, the C version supports variadic
@@ -245,7 +248,7 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // Is the size too much? Should we tone it down?
 
     // 1. Do a non-blocking read.
-    let mut buf = [0; 64 * 1024];
+    let mut buf = [0; MAX_KERNEL_PIPE_SIZE];
     let bread = unsafe {
         read(conn.fd, buf.as_mut_ptr() as *mut core::ffi::c_void, u32::try_from(buf.len())?)
     };
@@ -260,6 +263,41 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     conn.incoming.extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
 
     Ok(())
+}
+
+// Process one request if there is enough data
+fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
+    let len_size = core::mem::size_of::<u32>();
+    // 3. Try to parse the accumulated buffer according to the dummy protocol
+    // Get message length which is a 4-byte LE integer
+    if conn.incoming.len() < len_size {
+        return Ok(false);
+    }
+
+    let buffer_len = usize::try_from(u32::from_le_bytes(
+        conn.incoming
+            .get(0..4)
+            .ok_or(ReadError::InvalidRange(0, 4))?
+            .try_into()?,
+    ))?;
+
+    // Protocol error
+    if buffer_len > MAX_KERNEL_PIPE_SIZE {
+        conn.want_close = true;
+        Err(ReadError::InvalidRange(0, MAX_KERNEL_PIPE_SIZE))?;
+    }
+
+    let message_end = len_size.saturating_add(buffer_len);
+    // Get the message body
+    if message_end > conn.incoming.len() {
+        return Ok(false);
+    }
+
+    // 4. Process the parsed message
+    let message = conn.incoming.get(len_size..message_end).ok_or(ReadError::InvalidRange(len_size, message_end))?;
+    // Clear the buffer for the next message
+    conn.incoming.clear();
+    Ok(true)
 }
 
 fn handle_write(conn: &Conn) -> Result<(), ServerError> {

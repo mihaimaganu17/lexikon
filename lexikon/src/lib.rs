@@ -187,7 +187,7 @@ pub fn start_server() -> Result<(), ServerError> {
 }
 
 fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
-    // We preparea a dummy protocol, where each message is preceded by it's length under the form
+    // We prepared a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
@@ -207,7 +207,7 @@ fn read_msg(fd: i32) -> Result<Vec<u8>, ReadError> {
 }
 
 fn write_msg(fd: i32, write_buffer: &[u8]) -> Result<usize, WriteError> {
-    // We preparea a dummy protocol, where each message is preceded by it's length under the form
+    // We prepared a dummy protocol, where each message is preceded by it's length under the form
     // of a little endian 4-bytes unsigned integer.
     // |     len | msg1     |       len | msg2 | ... |
     // 0         4          len + 4
@@ -297,6 +297,7 @@ pub enum ServerError {
     ReadError(ReadError),
     WriteError(WriteError),
     StdIOError(std::io::Error),
+    TryFromSliceError(std::array::TryFromSliceError),
     TryFromIntError(std::num::TryFromIntError),
 }
 
@@ -345,6 +346,12 @@ impl From<std::num::TryFromIntError> for ServerError {
 impl From<std::num::TryFromIntError> for ClientError {
     fn from(err: std::num::TryFromIntError) -> Self {
         Self::TryFromIntError(err)
+    }
+}
+
+impl From<std::array::TryFromSliceError> for ServerError {
+    fn from(err: std::array::TryFromSliceError) -> Self {
+        Self::TryFromSliceError(err)
     }
 }
 
