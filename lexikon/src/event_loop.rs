@@ -170,15 +170,17 @@ fn run_app(fd: i32) -> Result<(), std::io::Error> {
         }
 
         // 3. Handle the listening socket
-        // If the listening socket returns, we are ready to accept new connection as the server
+        // If the listening socket returns, we are ready to accept new connection as the server.
+        // accept is treated as read in readiness notifications.
         // TODO: make this safe. get(0) and check for errors
-        if poll_args[0].revents != 0 {
-            println!("{:x}", poll_args[0].revents);
+        if poll_args[0].revents | POLLIN != 0 {
             // 
             if let Ok(conn) = handle_accept(fd) {
                 // Put it in the map
                 fd2conn.push(Some(conn));
             }
+        } else {
+            println!("{:x}", poll_args[0].revents);
         }
     }
 }
