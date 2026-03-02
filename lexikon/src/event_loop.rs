@@ -6,8 +6,12 @@ unsafe extern "C" {
     fn fcntl(filedes: i32, cmd: i32, value: i32) -> i32;
     // poll() examines a set of file descriptors to see if some of them are ready for I/O or if
     // certain events have occurred on them.  The fds argument is a pointer to an array of pollfd
-    // structures, as defined in ⟨poll.h⟩ (shown below).  The nfds argument specifies the size of
+    // structures, as defined in this file and in ⟨poll.h⟩.  The nfds argument specifies the size of
     // the fds array.
+    // Also referred to as `the readiness API`.
+    // If timeout is greater than zero, it specifies a maximum interval (in milliseconds) to wait
+    // for any file descriptor to become ready.  If timeout is zero, then poll() will return
+    // without blocking. If the value of timeout is -1, the poll blocks indefinitely.
     fn poll(fds: &mut PollFd, nfds: u32, timeout: i32) -> i32;
     // Note: Should also define `kqueue` which is used for real projects in BSD
     // Note: For file IO within an event loop, we should use io_uring
@@ -44,6 +48,16 @@ mod poll_flags {
     pub const POLLIN: u16 = 0x0001;
     // File descriptor is writable
     pub const POLLOUT: u16 = 0x0004;
+    /*
+     * These events are set if they occur regardless of whether they were
+     * requested.
+     */
+    // Some poll error occured
+    pub const POLLERR: u16 = 0x0008;
+    // File descriptor was "hung up"
+    pub const POLLHUP: u16 = 0x0010;
+    // Requested events "invalid"
+    pub const POLLNVAL: u16 = 0x0020;
 }
 
 #[derive(Debug)]
@@ -51,9 +65,10 @@ mod poll_flags {
 struct PollFd {
     // File descriptor to poll
     fd: u32,
-    // Events to look for
+    // Events to look for. Requests for wanting to read, write or both
     events: u16,
-    // Events returned, which may occure or have occured.
+    // Events returned, which may occur or have occured. Uses the same set of flags to indicate
+    // whether the `fd` is capable to `read` and / or `write`
     revents: u16,
 }
 
@@ -67,7 +82,7 @@ struct Conn {
     want_read: bool,
     want_write: bool,
     // Tells the event loop to destroy the connection
-    want_close: false,
+    want_close: bool,
 
     // Buffered input and output
     // Data to be parsed by the application. This storage buffers data from the socket for the
@@ -77,3 +92,11 @@ struct Conn {
     // written to the socket.
     outgoing: Vec<u8>,
 }
+
+fn event_loop() {
+    // A map of all client connections, keyed by fd. An fd is allocated as the smallest available
+    // non-negative integer, so the mapping from fd to the `Conn` state can be a flat array indexed
+    // by fd.
+    let mut fd2conn: Vec<Conn> = vec![];
+}
+
