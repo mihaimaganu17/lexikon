@@ -202,8 +202,14 @@ pub fn run_server() -> Result<(), ServerError> {
         if poll_args[0].revents & POLLIN != 0 {
             //
             if let Ok(conn) = handle_accept(fd) {
-                // Put it in the map
-                fd2conn.push(Some(conn));
+                // If we already had place for a connection, we are reusing that
+                let conn_idx = usize::try_from(conn.fd)?;
+                if conn_idx < fd2conn.len() {
+                    fd2conn[conn_idx].replace(conn);
+                } else {
+                    // Put it in the map
+                    fd2conn.push(Some(conn));
+                }
             }
         } else {
             println!("{:x}", poll_args[0].revents);
@@ -216,6 +222,7 @@ pub fn run_server() -> Result<(), ServerError> {
             // TODO: make it safe -> get and try_from
             let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
 
+            println!("Connection: {:?}", maybe_conn);
             if let Some(mut conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
                     handle_read(&mut conn)?;
