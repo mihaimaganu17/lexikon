@@ -275,7 +275,6 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
 
 fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // Is the size too much? Should we tone it down?
-
     // 1. Do a non-blocking read.
     let mut buf = [0; MAX_KERNEL_PIPE_SIZE];
     let bread = unsafe {
@@ -293,8 +292,11 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     let bread = usize::try_from(bread)?;
 
     // 2. Add new data to the `incoming` buffer.
+    // TODO: This fails for larger buffers and we need to keep track of how much data is left to
+    // read
     conn.incoming
         .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
+    println!("[before try] Current read buffer size: {}", conn.incoming.len());
 
     // Try to process the data in one request
     while try_one_request(conn)? {}
@@ -352,6 +354,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     // Clear the processed content leaving now the (potential) next message length starting at the
     // 0th index
     conn.incoming = conn.incoming.split_off(message_end);
+    println!("Current read buffer size: {}", conn.incoming.len());
     Ok(true)
 }
 
