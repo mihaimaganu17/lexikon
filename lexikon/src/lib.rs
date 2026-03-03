@@ -433,11 +433,15 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     };
     check_status(status)?;
 
+    // Create a big request that takes multiple iterations to process.
+    let k_max_msg_size = 32 << 20;
+    let mut big_boy: Vec<u8> = vec![];
+    big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server
-    let query_list = ["hello1", "hello2", "hello3"];
+    let query_list = [b"hello1".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy];
 
-    for query in query_list {
-        let bytes_written = write_msg(fd, query.as_bytes())?;
+    for query in &query_list {
+        let bytes_written = write_msg(fd, &query)?;
         println!("{} bytes written", bytes_written);
     }
 
