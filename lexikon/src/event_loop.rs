@@ -153,15 +153,14 @@ pub fn run_server() -> Result<(), ServerError> {
 
         // Put the listening sockets in the first position. This is the socket that we bind to our
         // server uses to accept new connections.
-        let poll_read = PollFd::new(fd as u32, POLLIN, 0);
+        let poll_read = PollFd::new(fd.try_into()?, POLLIN, 0);
         poll_args.push(poll_read);
         // The rest are connection sockets
         for maybe_conn in fd2conn.iter_mut() {
             let Some(conn) = maybe_conn else {
                 continue;
             };
-            // TODO: Check fd is not -1
-            let mut poll_fd = PollFd::new(conn.fd as u32, POLLERR, 0);
+            let mut poll_fd = PollFd::new(conn.fd, POLLERR, 0);
 
             // poll() flags from the application's intent
             if conn.want_read {
@@ -177,7 +176,7 @@ pub fn run_server() -> Result<(), ServerError> {
 
         // 2. Wait for file descriptor readiness using `poll` syscall
         // TODO: Maybe we can try a timeout and retry afterwards.
-        let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len() as u32, -1) };
+        let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len().try_into()?, -1) };
 
         match crate::check_status(poll_status) {
             Ok(_ready_fds) => {}
