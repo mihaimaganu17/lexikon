@@ -152,23 +152,28 @@ pub fn run_server() -> Result<(), ServerError> {
         poll_args.clear();
 
         // Put the listening sockets in the first position. This is the socket that we bind to our
-        // server uses to accept new connections.
+        // server to listen for new connections. Because accept acts as a read, we are telling poll
+        // to notify us when this particular socket is ready to be read
         let poll_read = PollFd::new(fd.try_into()?, POLLIN, 0);
         poll_args.push(poll_read);
-        // The rest are connection sockets
+
+        // The rest of the sockets we want to get readiness information for are connected sockets
         for maybe_conn in fd2conn.iter_mut() {
             let Some(conn) = maybe_conn else {
                 continue;
             };
+            // We want to know if there are any errors
             let mut poll_fd = PollFd::new(conn.fd, POLLERR, 0);
 
-            // poll() flags from the application's intent
+            // We also want to know if the sockets of the connections are ready to be read or wrote
+            // depending on the current state of the connection in the event loop.
             if conn.want_read {
                 poll_fd.events |= POLLIN;
             }
             if conn.want_write {
                 poll_fd.events |= POLLOUT;
             }
+            // Another fd ready to be polled
             poll_args.push(poll_fd);
         }
 
@@ -191,10 +196,9 @@ pub fn run_server() -> Result<(), ServerError> {
 
         // 3. Handle the listening socket
         // If the listening socket returns, we are ready to accept new connection as the server.
-        // accept is treated as read in readiness notifications.
+        // `accept` is treated as `read` in readiness notifications
         let listening_poll_fd = poll_args.get(0).ok_or(ReadError::InvalidIdx(0))?;
         if listening_poll_fd.revents & POLLIN != 0 {
-            //
             if let Ok(conn) = handle_accept(fd) {
                 let conn_idx = usize::try_from(conn.fd)?;
                 // If we already had place for this descriptor from a previously closed connection,
@@ -207,11 +211,12 @@ pub fn run_server() -> Result<(), ServerError> {
                 }
             }
         } else {
-            println!("{:x}", poll_args[0].revents);
+            println!("{:x}", listening_poll_fd.revents);
         }
 
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
+            // We get the connection at the index of the fd
             let conn_idx = usize::try_from(poll_fd.fd)?;
             let mut maybe_conn = fd2conn
                 .get_mut(conn_idx)
@@ -219,6 +224,7 @@ pub fn run_server() -> Result<(), ServerError> {
                 .take();
 
             if let Some(mut conn) = maybe_conn {
+                // Read or write based on readiness. Should we check for want_read and want_write?
                 if poll_fd.revents & POLLIN != 0 {
                     handle_read(&mut conn)?;
                 }
@@ -238,6 +244,8 @@ pub fn run_server() -> Result<(), ServerError> {
                         .ok_or(ReadError::InvalidIdx(conn_idx))?
                         .replace(conn);
                 }
+            } else {
+                println!("Missing fd {:x?}", poll_fd);
             }
         }
     }
@@ -253,7 +261,7 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
 
     crate::check_status(conn_fd)?;
     println!("Client sock addr: {:?}", client_sock_addr);
-    // Set the new connection fd to nonblocking mode
+    // Set the new connection fd to nonblocking mode in order to be polled
     set_nonblock(conn_fd)?;
 
     // Read the first request and return a connection state
@@ -330,8 +338,10 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     let response = String::from_utf8_lossy(&message);
 
     let response = format!("hello {}", response);
+    // Protocol: Length of the response first
     conn.outgoing
         .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
+    // Response afterwards
     conn.outgoing.extend_from_slice(response.as_bytes());
 
     // Update the readiness intention
