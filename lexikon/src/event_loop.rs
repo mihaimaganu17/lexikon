@@ -297,7 +297,7 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
         .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
 
     // Try to process the data in one request
-    try_one_request(conn)?;
+    while try_one_request(conn)? {}
 
     Ok(())
 }
@@ -349,7 +349,8 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         conn.want_read = false;
         conn.want_write = true;
     }
-    // Clear the buffer for the next message
+    // Clear the processed content leaving now the (potential) next message length starting at the
+    // 0th index
     conn.incoming = conn.incoming.split_off(message_end);
     Ok(true)
 }
