@@ -172,8 +172,6 @@ pub fn run_server() -> Result<(), ServerError> {
             poll_args.push(poll_fd);
         }
 
-        println!("poll_args {:#?}", poll_args);
-
         // 2. Wait for file descriptor readiness using `poll` syscall
         let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len().try_into()?, -1) };
 
@@ -211,7 +209,6 @@ pub fn run_server() -> Result<(), ServerError> {
         } else {
             println!("{:x}", poll_args[0].revents);
         }
-        println!("after {:#?}", fd2conn);
 
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
@@ -221,7 +218,6 @@ pub fn run_server() -> Result<(), ServerError> {
                 .ok_or(ReadError::InvalidIdx(conn_idx))?
                 .take();
 
-            println!("Connection: {:?}", maybe_conn);
             if let Some(mut conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
                     handle_read(&mut conn)?;
@@ -332,7 +328,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .get(len_size..message_end)
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
     let response = String::from_utf8_lossy(&message);
-    println!("{}", response);
+
     let response = format!("hello {}", response);
     conn.outgoing
         .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
