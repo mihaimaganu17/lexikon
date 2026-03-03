@@ -304,8 +304,14 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .incoming
         .get(len_size..message_end)
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
-    println!("{}", String::from_utf8_lossy(&message));
+    let response = String::from_utf8_lossy(&message);
+    println!("{}", response);
+    let response = format!("hello {}", response);
     // TODO: Populate outgoing with a response
+    conn.outgoing
+        .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
+    conn.outgoing.extend_from_slice(response.as_bytes());
+    // TODO: Test client
 
     // Update the readiness intention
     if conn.outgoing.len() > 0 {
