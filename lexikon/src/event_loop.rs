@@ -121,7 +121,7 @@ struct Conn {
     outgoing: Vec<u8>,
 }
 
-fn run_server(fd: i32) -> Result<(), ServerError> {
+pub fn run_server() -> Result<(), ServerError> {
     use poll_flags::*;
     // 1. Construct the `fd` list for `poll` function to use
 
@@ -129,6 +129,14 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
     // non-negative integer, so the mapping from fd to the `Conn` state can be a flat array indexed
     // by fd.
     let mut fd2conn: Vec<Option<Conn>> = vec![];
+    // The first 3 file descripors are reserved by the system as follow:
+    // - stdin: 0
+    // - stdout: 1
+    // - stderr: 2
+    // As such we are populating the connections with placeholder values
+    for _ in 0..3 {
+        fd2conn.push(None);
+    }
     // We want to construct this array in order to fill `poll` with it as an arg
     let mut poll_args: Vec<PollFd> = vec![];
 
@@ -164,6 +172,8 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
             poll_args.push(poll_fd);
         }
 
+        println!("poll_args {:#?}", poll_args);
+
         // 2. Wait for file descriptor readiness using `poll` syscall
         // TODO: Maybe we can try a timeout and retry afterwards.
         let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len() as u32, -1) };
@@ -198,6 +208,8 @@ fn run_server(fd: i32) -> Result<(), ServerError> {
 
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
+            println!("FD {}", poll_fd.fd);
+            println!("Maybe conn {}", fd2conn.len());
             // TODO: make it safe -> get and try_from
             let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
 

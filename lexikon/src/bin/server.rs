@@ -1,5 +1,6 @@
 use lexikon::start_server;
+use lexikon::run_server;
 
 pub fn main() {
-    start_server().expect("Failed to start server");
+    run_server().expect("Failed to start server");
 }

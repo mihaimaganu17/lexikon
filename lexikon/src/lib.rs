@@ -1,5 +1,7 @@
 mod event_loop;
 
+pub use event_loop::run_server;
+
 unsafe extern "C" {
     fn socket(domain: i32, t_type: i32, protocol: i32) -> i32;
     // option_len is a value-result parameter, initially containing the size of the buffer pointed
