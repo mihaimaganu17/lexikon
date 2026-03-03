@@ -102,7 +102,7 @@ impl PollFd {
 // Represents per-connection state of a socket used by the event loop of  the application
 #[derive(Default, Debug)]
 struct Conn {
-    fd: i32,
+    fd: u32,
     // Application's intention, for the event loop
     // `want_read` and `want_write` represents the fd list for the readiness API. In other words,
     // when the event loop polls this connection for the state, these values tell the event loop
@@ -151,7 +151,6 @@ pub fn run_server() -> Result<(), ServerError> {
         // Clear the arguments for poll
         poll_args.clear();
 
-        // TODO: Check fd is not -1
         // Put the listening sockets in the first position. This is the socket that we bind to our
         // server uses to accept new connections.
         let poll_read = PollFd::new(fd as u32, POLLIN, 0);
@@ -234,7 +233,7 @@ pub fn run_server() -> Result<(), ServerError> {
                 // the connection.
                 // TODO: In case of an error, create a `handle_err`
                 if (poll_fd.revents & POLLERR != 0) || conn.want_close {
-                    let status = unsafe { close(conn.fd) };
+                    let status = unsafe { close(i32::try_from(conn.fd)?) };
                     // TODO: These should be logged to avoid crashing the whole application.
                     crate::check_status(status)?;
                 } else {
@@ -260,7 +259,7 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
 
     // Read the first request and return a connection state
     let conn = Conn {
-        fd: conn_fd,
+        fd: u32::try_from(conn_fd)?,
         want_read: true,
         ..Conn::default()
     };
@@ -274,7 +273,7 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     let mut buf = [0; MAX_KERNEL_PIPE_SIZE];
     let bread = unsafe {
         read(
-            conn.fd,
+            conn.fd.try_into()?,
             buf.as_mut_ptr() as *mut core::ffi::c_void,
             u32::try_from(buf.len())?,
         )
@@ -355,7 +354,7 @@ fn handle_write(conn: &mut Conn) -> Result<(), ServerError> {
     }
     let bwritten = unsafe {
         write(
-            conn.fd,
+            conn.fd.try_into()?,
             conn.outgoing.as_ptr() as *const core::ffi::c_void,
             u32::try_from(conn.outgoing.len())?,
         )
