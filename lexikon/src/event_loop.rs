@@ -100,7 +100,7 @@ impl PollFd {
 }
 
 // Represents per-connection state of a socket used by the event loop of  the application
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Conn {
     fd: i32,
     // Application's intention, for the event loop
@@ -133,8 +133,10 @@ pub fn run_server() -> Result<(), ServerError> {
     // - stdin: 0
     // - stdout: 1
     // - stderr: 2
+    // The forth file descriptor is the listening socket of this server that accepts new
+    // connections.
     // As such we are populating the connections with placeholder values
-    for _ in 0..3 {
+    for _ in 0..4 {
         fd2conn.push(None);
     }
     // We want to construct this array in order to fill `poll` with it as an arg
@@ -196,6 +198,7 @@ pub fn run_server() -> Result<(), ServerError> {
         // If the listening socket returns, we are ready to accept new connection as the server.
         // accept is treated as read in readiness notifications.
         // TODO: make this safe. get(0) and check for errors
+        println!("before {:#?}", fd2conn);
         if poll_args[0].revents & POLLIN != 0 {
             //
             if let Ok(conn) = handle_accept(fd) {
@@ -205,13 +208,19 @@ pub fn run_server() -> Result<(), ServerError> {
         } else {
             println!("{:x}", poll_args[0].revents);
         }
+        println!("after {:#?}", fd2conn);
 
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
             println!("FD {}", poll_fd.fd);
             println!("Maybe conn {}", fd2conn.len());
             // TODO: make it safe -> get and try_from
-            let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
+            let mut maybe_conn = if (poll_fd.fd as usize) < fd2conn.len() {
+                fd2conn[poll_fd.fd as usize].take()
+            } else {
+                //Conn::default();
+                None
+            };
 
             if let Some(mut conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
