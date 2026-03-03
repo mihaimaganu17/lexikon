@@ -315,6 +315,7 @@ pub enum ClientError {
 #[derive(Debug)]
 pub enum ReadError {
     NoMessage,
+    InvalidIdx(usize),
     InvalidRange(usize, usize),
     StdIOError(std::io::Error),
     TryFromSliceError(std::array::TryFromSliceError),

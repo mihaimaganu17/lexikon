@@ -197,13 +197,13 @@ pub fn run_server() -> Result<(), ServerError> {
         // 3. Handle the listening socket
         // If the listening socket returns, we are ready to accept new connection as the server.
         // accept is treated as read in readiness notifications.
-        // TODO: make this safe. get(0) and check for errors
-        println!("before {:#?}", fd2conn);
-        if poll_args[0].revents & POLLIN != 0 {
+        let listening_poll_fd = poll_args.get(0).ok_or(ReadError::InvalidIdx(0))?;
+        if listening_poll_fd.revents & POLLIN != 0 {
             //
             if let Ok(conn) = handle_accept(fd) {
-                // If we already had place for a connection, we are reusing that
                 let conn_idx = usize::try_from(conn.fd)?;
+                // If we already had place for this descriptor from a previously closed connection,
+                // we are reusing that.
                 if conn_idx < fd2conn.len() {
                     fd2conn[conn_idx].replace(conn);
                 } else {
@@ -218,9 +218,9 @@ pub fn run_server() -> Result<(), ServerError> {
 
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
-            println!("FD {}", poll_fd.fd);
+            let conn_idx = usize::try_from(poll_fd.fd)?;
             // TODO: make it safe -> get and try_from
-            let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
+            let mut maybe_conn = fd2conn.get_mut(conn_idx).ok_or(ReadError::InvalidIdx(conn_idx))?.take();
 
             println!("Connection: {:?}", maybe_conn);
             if let Some(mut conn) = maybe_conn {
@@ -238,7 +238,7 @@ pub fn run_server() -> Result<(), ServerError> {
                     // TODO: These should be logged to avoid crashing the whole application.
                     crate::check_status(status)?;
                 } else {
-                    fd2conn[poll_fd.fd as usize].replace(conn);
+                    fd2conn.get_mut(conn_idx).ok_or(ReadError::InvalidIdx(conn_idx))?.replace(conn);
                 }
             }
         }
