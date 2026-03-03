@@ -213,14 +213,8 @@ pub fn run_server() -> Result<(), ServerError> {
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
             println!("FD {}", poll_fd.fd);
-            println!("Maybe conn {}", fd2conn.len());
             // TODO: make it safe -> get and try_from
-            let mut maybe_conn = if (poll_fd.fd as usize) < fd2conn.len() {
-                fd2conn[poll_fd.fd as usize].take()
-            } else {
-                //Conn::default();
-                None
-            };
+            let mut maybe_conn = fd2conn[poll_fd.fd as usize].take();
 
             if let Some(mut conn) = maybe_conn {
                 if poll_fd.revents & POLLIN != 0 {
@@ -288,6 +282,9 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // 2. Add new data to the `incoming` buffer.
     conn.incoming
         .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
+
+    // Try to process the data in one request
+    try_one_request(conn)?;
 
     Ok(())
 }
