@@ -7,3 +7,6 @@ edition = "2024"
 authors = ["Mihai Maganu <maganu.mihu@gmail.com>"]
 
 [dependencies]
+
+[lints.clippy]
+pedantic = "deny"

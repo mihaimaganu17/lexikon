@@ -175,7 +175,6 @@ pub fn run_server() -> Result<(), ServerError> {
         println!("poll_args {:#?}", poll_args);
 
         // 2. Wait for file descriptor readiness using `poll` syscall
-        // TODO: Maybe we can try a timeout and retry afterwards.
         let poll_status = unsafe { poll(poll_args.as_mut_ptr(), poll_args.len().try_into()?, -1) };
 
         match crate::check_status(poll_status) {
@@ -217,8 +216,10 @@ pub fn run_server() -> Result<(), ServerError> {
         // 4. Handle connection sockets. Sockets which are already connected from other clients
         for poll_fd in poll_args.iter().skip(1) {
             let conn_idx = usize::try_from(poll_fd.fd)?;
-            // TODO: make it safe -> get and try_from
-            let mut maybe_conn = fd2conn.get_mut(conn_idx).ok_or(ReadError::InvalidIdx(conn_idx))?.take();
+            let mut maybe_conn = fd2conn
+                .get_mut(conn_idx)
+                .ok_or(ReadError::InvalidIdx(conn_idx))?
+                .take();
 
             println!("Connection: {:?}", maybe_conn);
             if let Some(mut conn) = maybe_conn {
@@ -236,7 +237,10 @@ pub fn run_server() -> Result<(), ServerError> {
                     // TODO: These should be logged to avoid crashing the whole application.
                     crate::check_status(status)?;
                 } else {
-                    fd2conn.get_mut(conn_idx).ok_or(ReadError::InvalidIdx(conn_idx))?.replace(conn);
+                    fd2conn
+                        .get_mut(conn_idx)
+                        .ok_or(ReadError::InvalidIdx(conn_idx))?
+                        .replace(conn);
                 }
             }
         }
@@ -330,11 +334,9 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     let response = String::from_utf8_lossy(&message);
     println!("{}", response);
     let response = format!("hello {}", response);
-    // TODO: Populate outgoing with a response
     conn.outgoing
         .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
     conn.outgoing.extend_from_slice(response.as_bytes());
-    // TODO: Test client
 
     // Update the readiness intention
     if conn.outgoing.len() > 0 {
