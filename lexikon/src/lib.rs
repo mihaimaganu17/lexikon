@@ -413,6 +413,43 @@ pub enum WriteError {
     TryFromIntError(std::num::TryFromIntError),
 }
 
+pub fn pipeline_test_client() -> Result<(), ClientError> {
+    // 1. Create socket
+    let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
+
+    if fd == -1 {
+        return Err(ClientError::InvalidSocketHandle);
+    }
+
+    // 2. Connect to the loopback address -> 127.0.0.1
+    let sock_addr = SockAddr::new(u8::try_from(domain::AF_INET)?, 0x7f000001, 1234);
+
+    let status = unsafe {
+        connect(
+            fd,
+            &sock_addr,
+            u32::try_from(core::mem::size_of::<SockAddr>())?,
+        )
+    };
+    check_status(status)?;
+
+    // Build a collection of queries we want to make to the server
+    let query_list = ["hello1", "hello2", "hello3"];
+
+    for query in query_list {
+        let bytes_written = write_msg(fd, query.as_bytes())?;
+        println!("{} bytes written", bytes_written);
+    }
+
+    for idx in 0..query_list.len() {
+        let buffer = read_msg(fd)?;
+        println!("{}", String::from_utf8_lossy(&buffer));
+    }
+
+    unsafe { close(fd) };
+    Ok(())
+}
+
 pub fn start_client() -> Result<(), ClientError> {
     // 1. Create socket
     let fd = unsafe { socket(domain::AF_INET, socket_type::SOCK_STREAM, 0) };
