@@ -438,7 +438,7 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server
-    let query_list = [b"hello1".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy];
+    let query_list = [b"hello1".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy, b"hello5".to_vec()];
 
     for query in &query_list {
         let bytes_written = write_msg(fd, &query)?;
