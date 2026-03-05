@@ -320,6 +320,24 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     Ok(())
 }
 
+// Parses a client request of the form
+// | nstr | len1 | str1 | len2 | str2 | ... | len_nstr | str_nstr |
+// 0      4      8     8+len1
+//
+// - nstr is a 4 byte little endian unsigned integer with the number of items in the list
+fn parse_req(request: &[u8]) -> Result<Vec<u8>, ServerError> {
+    Ok(vec![])
+}
+
+fn read_u32_le(buffer: &[u8]) -> Result<u32, ServerError> {
+    let value = u32::from_le_bytes(
+        buffer
+            .get(0..4)
+            .ok_or(ReadError::InvalidRange(0, 4))?
+            .try_into()?);
+    Ok(value)
+}
+
 // Process one request if there is enough data
 fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     let len_size = core::mem::size_of::<u32>();
@@ -331,12 +349,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
 
     // 4. Process the parsed message
     // Read the message length
-    let msg_len = usize::try_from(u32::from_le_bytes(
-        conn.incoming
-            .get(0..4)
-            .ok_or(ReadError::InvalidRange(0, 4))?
-            .try_into()?,
-    ))?;
+    let msg_len = usize::try_from(read_u32_le(&conn.incoming)?)?;
 
     println!("Message to read len {}, from buffer of len: {}", msg_len, conn.incoming.len());
 
@@ -355,13 +368,17 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         return Ok(false);
     }
 
-    let message = conn
+    let request = conn
         .incoming
         .get(len_size..message_end)
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
-    let response = String::from_utf8_lossy(&message);
 
-    let response = format!("hello {}", response);
+    let cmd = parse_req(request)?;
+    // Fake response to not break stuff
+    let response = String::new();
+
+    // let response = String::from_utf8_lossy(&message);
+    // let response = format!("hello {}", response);
     // Protocol: Length of the response first
     conn.outgoing
         .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
