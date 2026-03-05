@@ -6,7 +6,7 @@ use crate::read;
 use crate::write;
 
 // Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
-const MAX_KERNEL_PIPE_SIZE: usize = 64 * 1024;
+const MAX_KERNEL_PIPE_SIZE: usize = 32 << 20;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -276,7 +276,7 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
 fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // Is the size too much? Should we tone it down?
     // 1. Do a non-blocking read.
-    let mut buf = [0; MAX_KERNEL_PIPE_SIZE];
+    let mut buf = [0; 1024];
     let bread = unsafe {
         read(
             conn.fd.try_into()?,
@@ -301,6 +301,19 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
 
     // Try to process the data in one request
     while try_one_request(conn)? {}
+
+    // Update the readiness intention
+    if conn.outgoing.len() > 0 {
+        conn.want_read = false;
+        conn.want_write = true;
+        // We can assume the client socket is likely to read a response after sending a request,
+        // so we do not have to wait for the next iteration to write to it.
+        // This assumption is false with a pipeline client which does not read while the server
+        // is writing.
+
+        // Optimistic non-blocking writes
+        return handle_write(conn);
+    }
 
     Ok(())
 }
@@ -352,12 +365,6 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
     // Response afterwards
     conn.outgoing.extend_from_slice(response.as_bytes());
-
-    // Update the readiness intention
-    if conn.outgoing.len() > 0 {
-        conn.want_read = false;
-        conn.want_write = true;
-    }
     // Clear the processed content leaving now the (potential) next message length starting at the
     // 0th index
     conn.incoming = conn.incoming.split_off(message_end);
@@ -376,6 +383,16 @@ fn handle_write(conn: &mut Conn) -> Result<(), ServerError> {
             u32::try_from(conn.outgoing.len())?,
         )
     };
+
+    // In case of optimistic non-blocking writes, the client may not be reading the response after
+    // sending a request. It may try to write multiple messages first. This could cause the write
+    // buffer to be full on the server-side.
+    if let Err(err) = crate::check_status(bwritten) {
+        if err.kind() == std::io::ErrorKind::WouldBlock {
+            return Ok(());
+        }
+    }
+
     // Protocol error
     if bwritten < 0 {
         conn.want_close = true;
