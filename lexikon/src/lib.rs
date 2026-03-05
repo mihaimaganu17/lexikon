@@ -1,6 +1,7 @@
 mod event_loop;
 
 pub use event_loop::run_server;
+use event_loop::ParseError;
 
 unsafe extern "C" {
     fn socket(domain: i32, t_type: i32, protocol: i32) -> i32;
@@ -298,6 +299,7 @@ pub enum ServerError {
     InvalidSocketHandle,
     ReadError(ReadError),
     WriteError(WriteError),
+    ParseError(ParseError),
     StdIOError(std::io::Error),
     TryFromSliceError(std::array::TryFromSliceError),
     TryFromIntError(std::num::TryFromIntError),
@@ -391,6 +393,12 @@ impl From<ReadError> for ClientError {
 impl From<ReadError> for ServerError {
     fn from(err: ReadError) -> Self {
         Self::ReadError(err)
+    }
+}
+
+impl From<ParseError> for ServerError {
+    fn from(err: ParseError) -> Self {
+        Self::ParseError(err)
     }
 }
 

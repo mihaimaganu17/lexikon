@@ -7,6 +7,7 @@ use crate::write;
 
 // Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
 const MAX_KERNEL_PIPE_SIZE: usize = 32 << 20;
+const MAX_CMD_ARGS: usize = 100;
 
 unsafe extern "C" {
     // File control -> fcntl() provides for control over descriptors.  The argument fildes is a
@@ -320,20 +321,71 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     Ok(())
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    TooManyArgs(usize),
+    TrailingGarbage,
+    ReadError(ReadError),
+    TryFromIntError(std::num::TryFromIntError),
+}
+
+impl From<ReadError> for ParseError {
+    fn from(err: ReadError) -> Self {
+        Self::ReadError(err)
+    }
+}
+
+impl From<std::num::TryFromIntError> for ParseError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
+
 // Parses a client request of the form
 // | nstr | len1 | str1 | len2 | str2 | ... | len_nstr | str_nstr |
 // 0      4      8     8+len1
 //
 // - nstr is a 4 byte little endian unsigned integer with the number of items in the list
-fn parse_req(request: &[u8]) -> Result<Vec<u8>, ServerError> {
-    Ok(vec![])
+fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
+    // Cursor where we read from for request
+    let mut idx = 0usize;
+    // Read the number of cmd components
+    let n_args = usize::try_from(read_u32_le(request, idx)?)?;
+    let size_of_u32 = core::mem::size_of::<u32>();
+    idx = idx.saturating_add(size_of_u32);
+
+    if n_args > MAX_CMD_ARGS {
+        return Err(ParseError::TooManyArgs(n_args));
+    }
+
+    let mut args = vec![];
+
+    // While we still have to process command arguments
+    while args.len() < n_args {
+        let arg_len = read_u32_le(request, 0)?;
+        idx = idx.saturating_add(size_of_u32);
+        let arg_end = idx.saturating_add(arg_len.try_into()?);
+
+        let arg = request
+            .get(idx..arg_end)
+            .ok_or(ReadError::InvalidRange(idx, arg_end))?;
+        idx = idx.saturating_add(arg_end);
+        let arg = String::from_utf8_lossy(arg);
+        args.push(arg.to_string());
+    }
+
+    if idx != request.len() {
+        return Err(ParseError::TrailingGarbage);
+    }
+
+    Ok(args)
 }
 
-fn read_u32_le(buffer: &[u8]) -> Result<u32, ServerError> {
+fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
     let value = u32::from_le_bytes(
         buffer
             .get(0..4)
-            .ok_or(ReadError::InvalidRange(0, 4))?
+            .ok_or(ReadError::InvalidRange(idx, idx+4))?
             .try_into()?);
     Ok(value)
 }
@@ -349,7 +401,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
 
     // 4. Process the parsed message
     // Read the message length
-    let msg_len = usize::try_from(read_u32_le(&conn.incoming)?)?;
+    let msg_len = usize::try_from(read_u32_le(&conn.incoming, 0)?)?;
 
     println!("Message to read len {}, from buffer of len: {}", msg_len, conn.incoming.len());
 
