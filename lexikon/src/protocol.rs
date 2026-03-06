@@ -18,20 +18,14 @@ impl LexRequest {
     pub fn to_request(&self) -> Result<Vec<u8>, LexRequestError> {
         let mut request = vec![];
         // Compute the totsal size of the protocol
-        // msg_len: u32 le -> 4 bytes
         // n_args: u32 le -> 4 bytes
         // arg elements, each having:
         //   u32 le 4 bytes len
         //   arg len
-        let mut total_size = 4 + 4;
-        for arg in &self.args {
-            total_size += 4 + arg.len();
-        }
-
-        request.extend_from_slice(&u32::try_from(total_size)?.to_le_bytes());
         request.extend_from_slice(&u32::try_from(self.args.len())?.to_le_bytes());
 
-        for arg in &self.args {
+        for arg in self.args.iter() {
+            println!("Arg {:#?} {}", arg, arg.len());
             request.extend_from_slice(&u32::try_from(arg.len())?.to_le_bytes());
             request.extend_from_slice(&arg.as_bytes());
         }

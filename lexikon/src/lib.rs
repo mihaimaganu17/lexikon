@@ -163,7 +163,7 @@ fn setup_socket() -> Result<i32, ServerError> {
 pub fn start_server() -> Result<(), ServerError> {
     let fd = setup_socket()?;
 
-    // 5. Accept incoming connections
+// 5. Accept incoming connections
     loop {
         let mut client_sock_addr = SockAddr::default();
         let mut sock_addr_len: u32 = u32::try_from(core::mem::size_of::<SockAddr>())?;
@@ -444,13 +444,15 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     check_status(status)?;
 
     // Create a big request that takes multiple iterations to process.
-    let k_max_msg_size = 32 << 20;
+    let k_max_msg_size = 32 * 100;
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server according to protocol
     let query_list = vec!["get".to_string(), "set".to_string(), "del".to_string(), String::from_utf8_lossy(&big_boy).to_string(), "get".to_string()];
     let lex_request = LexRequest::new(Some(query_list.clone()));
     let bytes = lex_request.to_request().expect("Failed to convert args to request");
+
+    println!("Bytes len {:?}", bytes.len());
 
     let bytes_written = write_msg(fd, &bytes)?;
     println!("{} bytes written", bytes_written);

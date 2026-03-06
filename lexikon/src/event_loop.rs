@@ -358,18 +358,20 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 
     let mut args = vec![];
 
-    println!("n_args {:#?}", n_args);
 
     // While we still have to process command arguments
     while args.len() < n_args {
-        let arg_len = read_u32_le(request, 0)?;
+        let arg_len = read_u32_le(request, idx)?;
         idx = idx.saturating_add(size_of_u32);
         let arg_end = idx.saturating_add(arg_len.try_into()?);
 
+        println!("arg_len {:#?}", arg_len);
+        println!("request len: {}, idx: {}, arg_end {}", request.len(), idx, arg_end);
         let arg = request
             .get(idx..arg_end)
             .ok_or(ReadError::InvalidRange(idx, arg_end))?;
-        idx = idx.saturating_add(arg_end);
+        print!("We did\n");
+        idx = arg_end;
         let arg = String::from_utf8_lossy(arg);
         args.push(arg.to_string());
     }
@@ -384,7 +386,7 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
     let value = u32::from_le_bytes(
         buffer
-            .get(0..4)
+            .get(idx..idx+4)
             .ok_or(ReadError::InvalidRange(idx, idx+4))?
             .try_into()?);
     Ok(value)
@@ -429,6 +431,7 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     // the connection.
     let Ok(cmd) = parse_req(request) else {
         conn.want_close = true;
+        println!("CMD");
         return Ok(false);
     };
 
