@@ -1,4 +1,4 @@
-struct LexRequest {
+pub struct LexRequest {
     args: Vec<String>,
 }
 

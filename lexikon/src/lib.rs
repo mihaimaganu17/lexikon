@@ -3,6 +3,7 @@ mod protocol;
 
 pub use event_loop::run_server;
 use event_loop::ParseError;
+use protocol::LexRequest;
 
 unsafe extern "C" {
     fn socket(domain: i32, t_type: i32, protocol: i32) -> i32;
@@ -447,16 +448,12 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server according to protocol
-    let query_list = [b"get".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy, b"hello5".to_vec()];
+    let query_list = vec!["get".to_string(), "set".to_string(), "del".to_string(), String::from_utf8_lossy(&big_boy).to_string(), "get".to_string()];
+    let lex_request = LexRequest::new(Some(query_list.clone()));
+    let bytes = lex_request.to_request().expect("Failed to convert args to request");
 
-    // Send the number of messages in request, according to protocol
-    let write_buffer_len = u32::try_from(query_list.len())?.to_le_bytes();
-    let mut bytes_written = write_full(fd, &write_buffer_len)?;
-
-    for query in &query_list {
-        let bytes_written = write_msg(fd, &query)?;
-        println!("{} bytes written", bytes_written);
-    }
+    let bytes_written = write_msg(fd, &bytes)?;
+    println!("{} bytes written", bytes_written);
 
     for idx in 0..query_list.len() {
         let buffer = read_msg(fd)?;
