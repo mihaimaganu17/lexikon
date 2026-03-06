@@ -1,4 +1,5 @@
 mod event_loop;
+mod protocol;
 
 pub use event_loop::run_server;
 use event_loop::ParseError;
@@ -445,8 +446,12 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     let k_max_msg_size = 32 << 20;
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
-    // Build a collection of queries we want to make to the server
-    let query_list = [b"hello1".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy, b"hello5".to_vec()];
+    // Build a collection of queries we want to make to the server according to protocol
+    let query_list = [b"get".to_vec(), b"hello2".to_vec(), b"hello3".to_vec(), big_boy, b"hello5".to_vec()];
+
+    // Send the number of messages in request, according to protocol
+    let write_buffer_len = u32::try_from(query_list.len())?.to_le_bytes();
+    let mut bytes_written = write_full(fd, &write_buffer_len)?;
 
     for query in &query_list {
         let bytes_written = write_msg(fd, &query)?;

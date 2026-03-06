@@ -297,10 +297,8 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     // 2. Add new data to the `incoming` buffer.
     // TODO: This fails for larger buffers and we need to keep track of how much data is left to
     // read
-    println!("[Failing] bytes read {}", bread);
     conn.incoming
         .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
-    println!("[before try] Current read buffer size: {} -> expected to read {}", conn.incoming.len(), bread);
 
     // Try to process the data in one request
     while try_one_request(conn)? {}
@@ -359,6 +357,8 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
     }
 
     let mut args = vec![];
+
+    println!("n_args {:#?}", n_args);
 
     // While we still have to process command arguments
     while args.len() < n_args {
@@ -425,7 +425,14 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
         .get(len_size..message_end)
         .ok_or(ReadError::InvalidRange(len_size, message_end))?;
 
-    let cmd = parse_req(request)?;
+    // If we are erroring when parsing the request, we send a signal to the event loop to close
+    // the connection.
+    let Ok(cmd) = parse_req(request) else {
+        conn.want_close = true;
+        return Ok(false);
+    };
+
+    println!("cmd");
     // Fake response to not break stuff
     let response = String::new();
 
