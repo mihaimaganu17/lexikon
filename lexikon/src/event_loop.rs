@@ -358,7 +358,6 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 
     let mut args = vec![];
 
-
     // While we still have to process command arguments
     while args.len() < n_args {
         let arg_len = read_u32_le(request, idx)?;
@@ -366,7 +365,12 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
         let arg_end = idx.saturating_add(arg_len.try_into()?);
 
         println!("arg_len {:#?}", arg_len);
-        println!("request len: {}, idx: {}, arg_end {}", request.len(), idx, arg_end);
+        println!(
+            "request len: {}, idx: {}, arg_end {}",
+            request.len(),
+            idx,
+            arg_end
+        );
         let arg = request
             .get(idx..arg_end)
             .ok_or(ReadError::InvalidRange(idx, arg_end))?;
@@ -386,9 +390,10 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
     let value = u32::from_le_bytes(
         buffer
-            .get(idx..idx+4)
-            .ok_or(ReadError::InvalidRange(idx, idx+4))?
-            .try_into()?);
+            .get(idx..idx + 4)
+            .ok_or(ReadError::InvalidRange(idx, idx + 4))?
+            .try_into()?,
+    );
     Ok(value)
 }
 
@@ -405,7 +410,11 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     // Read the message length
     let msg_len = usize::try_from(read_u32_le(&conn.incoming, 0)?)?;
 
-    println!("Message to read len {}, from buffer of len: {}", msg_len, conn.incoming.len());
+    println!(
+        "Message to read len {}, from buffer of len: {}",
+        msg_len,
+        conn.incoming.len()
+    );
 
     // Protocol error
     if msg_len > MAX_KERNEL_PIPE_SIZE {
@@ -415,7 +424,11 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     }
 
     let message_end = len_size.saturating_add(msg_len);
-    println!("needed {} -> available {}", message_end, conn.incoming.len());
+    println!(
+        "needed {} -> available {}",
+        message_end,
+        conn.incoming.len()
+    );
     // Get the message body
     if message_end > conn.incoming.len() {
         // If we don't have enough data, we still want to read

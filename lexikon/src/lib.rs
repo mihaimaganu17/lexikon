@@ -1,8 +1,8 @@
 mod event_loop;
 mod protocol;
 
-pub use event_loop::run_server;
 use event_loop::ParseError;
+pub use event_loop::run_server;
 use protocol::LexRequest;
 
 unsafe extern "C" {
@@ -163,7 +163,7 @@ fn setup_socket() -> Result<i32, ServerError> {
 pub fn start_server() -> Result<(), ServerError> {
     let fd = setup_socket()?;
 
-// 5. Accept incoming connections
+    // 5. Accept incoming connections
     loop {
         let mut client_sock_addr = SockAddr::default();
         let mut sock_addr_len: u32 = u32::try_from(core::mem::size_of::<SockAddr>())?;
@@ -448,9 +448,17 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server according to protocol
-    let query_list = vec!["get".to_string(), "set".to_string(), "del".to_string(), String::from_utf8_lossy(&big_boy).to_string(), "get".to_string()];
+    let query_list = vec![
+        "get".to_string(),
+        "set".to_string(),
+        "del".to_string(),
+        String::from_utf8_lossy(&big_boy).to_string(),
+        "get".to_string(),
+    ];
     let lex_request = LexRequest::new(Some(query_list.clone()));
-    let bytes = lex_request.to_request().expect("Failed to convert args to request");
+    let bytes = lex_request
+        .to_request()
+        .expect("Failed to convert args to request");
 
     println!("Bytes len {:?}", bytes.len());
 

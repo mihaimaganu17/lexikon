@@ -10,9 +10,7 @@ impl LexRequest {
             vec![]
         };
 
-        Self {
-            args
-        }
+        Self { args }
     }
 
     pub fn to_request(&self) -> Result<Vec<u8>, LexRequestError> {
@@ -33,6 +31,9 @@ impl LexRequest {
         Ok(request)
     }
 }
+
+// TODO
+pub struct LexResponse {}
 
 #[derive(Debug)]
 pub enum LexRequestError {
