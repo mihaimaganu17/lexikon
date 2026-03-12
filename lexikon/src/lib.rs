@@ -450,22 +450,13 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     // Build a collection of queries we want to make to the server according to protocol
     let queries = vec![
         vec![
-        "set".to_string(),
-        "money".to_string(),
-        "132,334".to_string(),
+            "set".to_string(),
+            "money".to_string(),
+            "132,334".to_string(),
         ],
-        vec![
-        "get".to_string(),
-        "money".to_string(),
-        ],
-        vec![
-        "del".to_string(),
-        "money".to_string(),
-        ],
-        vec![
-        "get".to_string(),
-        "money".to_string(),
-        ]
+        vec!["get".to_string(), "money".to_string()],
+        vec!["del".to_string(), "money".to_string()],
+        vec!["get".to_string(), "money".to_string()],
     ];
     for query_list in queries {
         let lex_request = LexRequest::new(Some(query_list.clone()));

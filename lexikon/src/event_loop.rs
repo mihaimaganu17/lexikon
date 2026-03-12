@@ -397,7 +397,8 @@ struct Response<'a> {
 
 #[derive(Debug, Default)]
 pub enum ResponseStatus {
-    #[default] ResOk = 0,
+    #[default]
+    ResOk = 0,
     // Error
     ResErr = 1,
     // Not found
@@ -445,7 +446,6 @@ fn handle_request<'a>(
                 }
                 _ => response.status = ResponseStatus::ResNx,
             }
-
         }
         3 => {
             let mut args = cmd.iter();
@@ -484,7 +484,10 @@ fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
 }
 
 // Process one request if there is enough data
-fn try_one_request(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Result<bool, ServerError> {
+fn try_one_request(
+    conn: &mut Conn,
+    g_data: &mut BTreeMap<String, String>,
+) -> Result<bool, ServerError> {
     let len_size = core::mem::size_of::<u32>();
     // 3. Try to parse the accumulated buffer according to the dummy protocol
     // Get message length which is a 4-byte LE integer
@@ -550,10 +553,9 @@ fn try_one_request(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Re
 
 fn write_response(conn: &mut Conn, response: Response) -> Result<(), ResponseError> {
     let response_len = u32::try_from(4 + response.data.len())?;
-    let Response {status, data} = response;
+    let Response { status, data } = response;
     // Protocol: Length of the response first
-    conn.outgoing
-        .extend_from_slice(&response_len.to_le_bytes());
+    conn.outgoing.extend_from_slice(&response_len.to_le_bytes());
     conn.outgoing
         .extend_from_slice(&(status as u32).to_le_bytes());
     // Response afterwards
