@@ -391,19 +391,48 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 
 #[derive(Debug, Default)]
 struct Response {
-    status: u32,
+    status: ResponseStatus,
     data: Vec<u8>,
+}
+
+#[derive(Debug, Default)]
+pub enum ResponseStatus {
+    #[default] ResOk = 0,
+    // Error
+    ResErr = 1,
+    // Not found
+    ResNx = 2,
 }
 
 #[derive(Debug)]
 pub enum ResponseError {
+    MissingArg,
 }
 
 
-fn handle_request(cmd: &str) -> Result<Response, ResponseError> {
-    Ok(
-        Response::default()
-    )
+fn handle_request(
+    cmd: Vec<String>,
+    g_data: &mut BTreeMap<String, String>,
+) -> Result<Response, ResponseError> {
+    let mut response = Response::default();
+
+    match cmd.len() {
+        2 => {
+            let mut args = cmd.iter();
+            let Some(arg1) = args.next() else {
+                return Err(ResponseError::MissingArg);
+            };
+
+            if let Some(value) = g_data.get(arg1) {
+                response.data.extend_from_slice(value.as_bytes());
+            } else {
+                response.status = ResponseStatus::ResNx;
+            };
+        }
+        _ => response.status = ResponseStatus::ResErr,
+    }
+
+    Ok(response)
 }
 
 fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
