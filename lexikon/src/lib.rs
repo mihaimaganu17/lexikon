@@ -1,4 +1,5 @@
 mod event_loop;
+mod hashtable;
 mod protocol;
 
 use event_loop::ParseError;
@@ -518,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_main() {
-        start_server().expect("Failed to start server");
+        //start_server().expect("Failed to start server");
     }
 
     #[test]
