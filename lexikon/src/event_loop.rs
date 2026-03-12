@@ -422,17 +422,20 @@ fn handle_request(
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
+            let Some(key) = args.next() else {
+                return Err(ResponseError::MissingArg);
+            };
 
             match arg1.as_str() {
                 "get" => {
-                    let Some(key) = args.next() else {
-                        return Err(ResponseError::MissingArg);
-                    };
                     if let Some(value) = g_data.get(key.as_str()) {
                         response.data.extend_from_slice(value.as_bytes());
                     } else {
                         response.status = ResponseStatus::ResNx;
                     };
+                }
+                "del" => {
+                    g_data.remove(key.as_str());
                 }
                 _ => response.status = ResponseStatus::ResNx,
             }
