@@ -5,6 +5,8 @@ use crate::close;
 use crate::read;
 use crate::write;
 
+use std::collections::BTreeMap;
+
 // Max buffer size (allegedly) allowed by the xnu kernel (aka BIG_PIPE_SIZE)
 const MAX_KERNEL_PIPE_SIZE: usize = 32 << 20;
 const MAX_CMD_ARGS: usize = 100;
@@ -150,6 +152,8 @@ pub fn run_server() -> Result<(), ServerError> {
     // Set the listening socket as non-blocking
     set_nonblock(fd)?;
 
+    let mut g_data = BTreeMap::<String, String>::new();
+
     loop {
         // Clear the arguments for poll
         poll_args.clear();
@@ -229,7 +233,7 @@ pub fn run_server() -> Result<(), ServerError> {
             if let Some(mut conn) = maybe_conn {
                 // Read or write based on readiness. Should we check for want_read and want_write?
                 if poll_fd.revents & POLLIN != 0 {
-                    handle_read(&mut conn)?;
+                    handle_read(&mut conn, &mut g_data)?;
                 }
                 if poll_fd.revents & POLLOUT != 0 {
                     handle_write(&mut conn)?;
@@ -276,7 +280,7 @@ fn handle_accept(fd: i32) -> Result<Conn, ServerError> {
     Ok(conn)
 }
 
-fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
+fn handle_read(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Result<(), ServerError> {
     // Is the size too much? Should we tone it down?
     // 1. Do a non-blocking read.
     let mut buf = [0; 1024];
@@ -295,13 +299,11 @@ fn handle_read(conn: &mut Conn) -> Result<(), ServerError> {
     let bread = usize::try_from(bread)?;
 
     // 2. Add new data to the `incoming` buffer.
-    // TODO: This fails for larger buffers and we need to keep track of how much data is left to
-    // read
     conn.incoming
         .extend_from_slice(buf.get(0..bread).ok_or(ReadError::InvalidRange(0, bread))?);
 
     // Try to process the data in one request
-    while try_one_request(conn)? {}
+    while try_one_request(conn, g_data)? {}
 
     // Update the readiness intention
     if conn.outgoing.len() > 0 {
@@ -387,6 +389,23 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
     Ok(args)
 }
 
+#[derive(Debug, Default)]
+struct Response {
+    status: u32,
+    data: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum ResponseError {
+}
+
+
+fn handle_request(cmd: &str) -> Result<Response, ResponseError> {
+    Ok(
+        Response::default()
+    )
+}
+
 fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
     let value = u32::from_le_bytes(
         buffer
@@ -398,7 +417,7 @@ fn read_u32_le(buffer: &[u8], idx: usize) -> Result<u32, ReadError> {
 }
 
 // Process one request if there is enough data
-fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
+fn try_one_request(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Result<bool, ServerError> {
     let len_size = core::mem::size_of::<u32>();
     // 3. Try to parse the accumulated buffer according to the dummy protocol
     // Get message length which is a 4-byte LE integer
@@ -444,11 +463,9 @@ fn try_one_request(conn: &mut Conn) -> Result<bool, ServerError> {
     // the connection.
     let Ok(cmd) = parse_req(request) else {
         conn.want_close = true;
-        println!("CMD");
         return Ok(false);
     };
 
-    println!("cmd");
     // Fake response to not break stuff
     let response = String::new();
 
