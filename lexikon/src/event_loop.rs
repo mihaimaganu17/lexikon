@@ -390,9 +390,9 @@ fn parse_req(request: &[u8]) -> Result<Vec<String>, ParseError> {
 }
 
 #[derive(Debug, Default)]
-struct Response {
+struct Response<'a> {
     status: ResponseStatus,
-    data: Vec<u8>,
+    data: &'a [u8],
 }
 
 #[derive(Debug, Default)]
@@ -416,15 +416,15 @@ impl From<std::num::TryFromIntError> for ResponseError {
     }
 }
 
-fn handle_request(
-    cmd: Vec<String>,
-    g_data: &mut BTreeMap<String, String>,
-) -> Result<Response, ResponseError> {
+fn handle_request<'a>(
+    cmd: &'a [String],
+    g_data: &'a mut BTreeMap<String, String>,
+) -> Result<Response<'a>, ResponseError> {
     let mut response = Response::default();
 
     match cmd.len() {
         2 => {
-            let mut args = cmd.clone().into_iter();
+            let mut args = cmd.iter();
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
@@ -435,7 +435,7 @@ fn handle_request(
             match arg1.as_str() {
                 "get" => {
                     if let Some(value) = g_data.get(key.as_str()) {
-                        response.data.extend_from_slice(value.as_bytes());
+                        response.data = value.as_bytes();
                     } else {
                         response.status = ResponseStatus::ResNx;
                     };
@@ -448,7 +448,7 @@ fn handle_request(
 
         }
         3 => {
-            let mut args = cmd.clone().into_iter();
+            let mut args = cmd.iter();
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
@@ -462,15 +462,13 @@ fn handle_request(
                         return Err(ResponseError::MissingArg);
                     };
                     // For the moment, we do not care about the return of this
-                    g_data.insert(key, value);
+                    g_data.insert(key.to_string(), value.to_string());
                 }
                 _ => response.status = ResponseStatus::ResNx,
             }
         }
         _ => response.status = ResponseStatus::ResErr,
     }
-
-    println!("Cmd {:#?}\nResponse {:#?}", cmd, response);
 
     Ok(response)
 }
@@ -535,7 +533,7 @@ fn try_one_request(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Re
         return Ok(false);
     };
 
-    let Ok(response) = handle_request(cmd, g_data) else {
+    let Ok(response) = handle_request(&cmd, g_data) else {
         conn.want_close = true;
         return Ok(false);
     };
