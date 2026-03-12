@@ -407,8 +407,14 @@ pub enum ResponseStatus {
 #[derive(Debug)]
 pub enum ResponseError {
     MissingArg,
+    TryFromIntError(std::num::TryFromIntError),
 }
 
+impl From<std::num::TryFromIntError> for ResponseError {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Self::TryFromIntError(err)
+    }
+}
 
 fn handle_request(
     cmd: Vec<String>,
@@ -527,20 +533,33 @@ fn try_one_request(conn: &mut Conn, g_data: &mut BTreeMap<String, String>) -> Re
         return Ok(false);
     };
 
-    // Fake response to not break stuff
-    let response = String::new();
+    let Ok(response) = handle_request(cmd, g_data) else {
+        conn.want_close = true;
+        return Ok(false);
+    };
 
-    // let response = String::from_utf8_lossy(&message);
-    // let response = format!("hello {}", response);
-    // Protocol: Length of the response first
-    conn.outgoing
-        .extend_from_slice(&u32::try_from(response.len())?.to_le_bytes());
-    // Response afterwards
-    conn.outgoing.extend_from_slice(response.as_bytes());
+    let Ok(_) = write_response(conn, response) else {
+        conn.want_close = true;
+        return Ok(false);
+    };
     // Clear the processed content leaving now the (potential) next message length starting at the
     // 0th index
     conn.incoming = conn.incoming.split_off(message_end);
     Ok(true)
+}
+
+fn write_response(conn: &mut Conn, response: Response) -> Result<(), ResponseError> {
+    let response_len = u32::try_from(4 + response.data.len())?;
+    let Response {status, data} = response;
+    // Protocol: Length of the response first
+    conn.outgoing
+        .extend_from_slice(&response_len.to_le_bytes());
+    conn.outgoing
+        .extend_from_slice(&(status as u32).to_le_bytes());
+    // Response afterwards
+    conn.outgoing.extend_from_slice(&data);
+
+    Ok(())
 }
 
 fn handle_write(conn: &mut Conn) -> Result<(), ServerError> {
