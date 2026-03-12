@@ -418,16 +418,45 @@ fn handle_request(
 
     match cmd.len() {
         2 => {
-            let mut args = cmd.iter();
+            let mut args = cmd.into_iter();
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
 
-            if let Some(value) = g_data.get(arg1) {
-                response.data.extend_from_slice(value.as_bytes());
-            } else {
-                response.status = ResponseStatus::ResNx;
+            match arg1.as_str() {
+                "get" => {
+                    let Some(key) = args.next() else {
+                        return Err(ResponseError::MissingArg);
+                    };
+                    if let Some(value) = g_data.get(key.as_str()) {
+                        response.data.extend_from_slice(value.as_bytes());
+                    } else {
+                        response.status = ResponseStatus::ResNx;
+                    };
+                }
+                _ => response.status = ResponseStatus::ResNx,
+            }
+
+        }
+        3 => {
+            let mut args = cmd.into_iter();
+            let Some(arg1) = args.next() else {
+                return Err(ResponseError::MissingArg);
             };
+
+            match arg1.as_str() {
+                "set" => {
+                    let Some(key) = args.next() else {
+                        return Err(ResponseError::MissingArg);
+                    };
+                    let Some(value) = args.next() else {
+                        return Err(ResponseError::MissingArg);
+                    };
+                    // For the moment, we do not care about the return of this
+                    g_data.insert(key, value);
+                }
+                _ => response.status = ResponseStatus::ResNx,
+            }
         }
         _ => response.status = ResponseStatus::ResErr,
     }
