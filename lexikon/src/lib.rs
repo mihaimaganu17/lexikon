@@ -448,26 +448,39 @@ pub fn pipeline_test_client() -> Result<(), ClientError> {
     let mut big_boy: Vec<u8> = vec![];
     big_boy.resize(k_max_msg_size, 0x5A);
     // Build a collection of queries we want to make to the server according to protocol
-    let query_list = vec![
-        "get".to_string(),
+    let queries = vec![
+        vec![
         "set".to_string(),
-        "del".to_string(),
-        String::from_utf8_lossy(&big_boy).to_string(),
+        "money".to_string(),
+        "132,334".to_string(),
+        ],
+        vec![
         "get".to_string(),
+        "money".to_string(),
+        ],
+        vec![
+        "del".to_string(),
+        "money".to_string(),
+        ],
+        vec![
+        "get".to_string(),
+        "money".to_string(),
+        ]
     ];
-    let lex_request = LexRequest::new(Some(query_list.clone()));
-    let bytes = lex_request
-        .to_request()
-        .expect("Failed to convert args to request");
+    for query_list in queries {
+        let lex_request = LexRequest::new(Some(query_list.clone()));
+        let bytes = lex_request
+            .to_request()
+            .expect("Failed to convert args to request");
 
-    println!("Bytes len {:?}", bytes.len());
+        println!("Bytes len {:?}", bytes.len());
 
-    let bytes_written = write_msg(fd, &bytes)?;
-    println!("{} bytes written", bytes_written);
+        let bytes_written = write_msg(fd, &bytes)?;
+        println!("{} bytes written", bytes_written);
 
-    for idx in 0..query_list.len() {
+        // TODO: Need to parse buffer in a Response format
         let buffer = read_msg(fd)?;
-        println!("{}", String::from_utf8_lossy(&buffer));
+        println!("Response {}", String::from_utf8_lossy(&buffer));
     }
 
     unsafe { close(fd) };

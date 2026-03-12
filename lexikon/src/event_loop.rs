@@ -424,7 +424,7 @@ fn handle_request(
 
     match cmd.len() {
         2 => {
-            let mut args = cmd.into_iter();
+            let mut args = cmd.clone().into_iter();
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
@@ -448,7 +448,7 @@ fn handle_request(
 
         }
         3 => {
-            let mut args = cmd.into_iter();
+            let mut args = cmd.clone().into_iter();
             let Some(arg1) = args.next() else {
                 return Err(ResponseError::MissingArg);
             };
@@ -469,6 +469,8 @@ fn handle_request(
         }
         _ => response.status = ResponseStatus::ResErr,
     }
+
+    println!("Cmd {:#?}\nResponse {:#?}", cmd, response);
 
     Ok(response)
 }
