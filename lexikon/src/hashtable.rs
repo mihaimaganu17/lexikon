@@ -1,4 +1,6 @@
 //! C-style chaining hashtable implementation
+use core::alloc::Layout;
+use std::alloc::alloc_zeroed;
 
 #[derive(Default, Debug)]
 struct HNode {
@@ -11,7 +13,7 @@ struct HNode {
 #[derive(Debug, Default)]
 struct HashTable {
     // Pointer to the hashtable
-    tab: *const *const HNode,
+    tab: *mut *mut HNode,
     // Mask to map the hash according to our desired size
     mask: usize,
     // Number of keys currently in the table
@@ -29,8 +31,16 @@ impl HashTable {
             return Err(HashTableError::SizeNotPowerOfTwo(size));
         }
 
+        let layout = Layout::from_size_align(
+            size * core::mem::size_of::<*const HNode>(),
+            core::mem::size_of::<usize>(),
+        )?;
+
+        let tab = unsafe { alloc_zeroed(layout) };
+
         Ok(Self {
             size,
+            tab: tab as *mut *mut HNode,
             ..Self::default()
         })
     }
@@ -40,6 +50,13 @@ impl HashTable {
 pub enum HashTableError {
     NegativeSize,
     SizeNotPowerOfTwo(usize),
+    LayoutError(core::alloc::LayoutError),
+}
+
+impl From<core::alloc::LayoutError> for HashTableError {
+    fn from(err: core::alloc::LayoutError) -> Self {
+        Self::LayoutError(err)
+    }
 }
 
 #[cfg(test)]
