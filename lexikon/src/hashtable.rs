@@ -1,6 +1,7 @@
 //! C-style chaining hashtable implementation
 use core::alloc::Layout;
 use std::alloc::alloc_zeroed;
+use std::fmt;
 
 #[derive(Default, Debug)]
 struct HNode {
@@ -19,6 +20,27 @@ struct HashTable {
     mask: usize,
     // Number of keys currently in the table
     len: usize,
+}
+
+impl fmt::Display for HashTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut idx = 0;
+        let mut pos = 0;
+        let tab_cursor = self.tab;
+        if tab_cursor.is_null() {
+            return Ok(())
+        }
+
+        while idx < len && pos < mask {
+            let mut pos_ptr = tab_cursor.offset(pos);
+            while !pos_ptr.is_null() {
+                elem = *pos_ptr;
+                write!(f, "({})", elem.hash);
+                pos_ptr = pos_ptr.next;
+            }
+            pos += 1;
+        }
+    }
 }
 
 impl HashTable {
@@ -103,6 +125,6 @@ mod tests {
             unsafe { htable.insert(&mut hnode).expect("Failed to insert") };
         }
         assert!(htable.len(), hashes.len());
-        println!("HashTable {:#?}", htable);
+        println!("HashTable {}", htable);
     }
 }
