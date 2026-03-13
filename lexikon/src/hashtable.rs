@@ -29,7 +29,6 @@ impl HashTable {
             return Err(HashTableError::SizeNotPowerOfTwo(size));
         }
 
-
         Ok(Self {
             size,
             ..Self::default()
