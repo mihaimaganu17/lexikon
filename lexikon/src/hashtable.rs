@@ -31,9 +31,10 @@ impl fmt::Display for HashTable {
             return Ok(())
         }
 
-        while idx < self.len() && pos < self.mask as isize {
+        while idx < self.len() && pos <= self.mask as isize {
             unsafe {
             let mut pos_ptr = tab_cursor.offset(pos);
+            println!("Pos ptr {:#?}", pos_ptr);
             if pos_ptr.is_null() {
                 pos += 1;
                 continue;
@@ -42,8 +43,9 @@ impl fmt::Display for HashTable {
             let mut hash_ptr = *pos_ptr;
             while !hash_ptr.is_null() {
                 let elem = hash_ptr;
-                write!(f, "({:#?} -> {}) -> {:#?}", elem as *mut u64, (*elem).hash, (*elem).next);
+                write!(f, "({:#?} -> {}) -> {:#?}\n", elem as *mut u64, (*elem).hash, (*elem).next);
                 hash_ptr = (*elem).next;
+                idx += 1;
             }
             pos += 1;
             }
@@ -133,6 +135,21 @@ mod tests {
     fn hashtable_insert() {
         let hashes = [1, 2, 3, 4, 5];
         let mut htable = HashTable::init(64).expect("Failed to init hashtable");
+        for hash in hashes {
+            let mut hnode = Box::new(HNode {
+                next: core::ptr::null::<HNode>() as *mut HNode,
+                hash,
+            });
+            unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
+        }
+        assert!(htable.len() == hashes.len());
+        println!("HashTable {}", htable);
+    }
+
+    #[test]
+    fn hashtable_insert_chain() {
+        let hashes = [1, 2, 3, 4, 5];
+        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
         for hash in hashes {
             let mut hnode = Box::new(HNode {
                 next: core::ptr::null::<HNode>() as *mut HNode,
