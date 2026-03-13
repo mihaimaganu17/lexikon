@@ -18,7 +18,7 @@ struct HashTable {
     // Mask to map the hash according to our desired size
     mask: usize,
     // Number of keys currently in the table
-    size: usize,
+    len: usize,
 }
 
 impl HashTable {
@@ -40,9 +40,9 @@ impl HashTable {
         let tab = unsafe { alloc_zeroed(layout) };
 
         Ok(Self {
-            size,
             tab: tab as *mut *mut HNode,
-            ..Self::default()
+            mask: size - 1,
+            len: 0,
         })
     }
 }
