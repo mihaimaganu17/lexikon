@@ -28,26 +28,32 @@ impl fmt::Display for HashTable {
         let mut pos = 0isize;
         let tab_cursor = self.tab;
         if tab_cursor.is_null() {
-            return Ok(())
+            return Ok(());
         }
 
         while idx < self.len() && pos <= self.mask as isize {
             unsafe {
-            let mut pos_ptr = tab_cursor.offset(pos);
-            println!("Slot {:#?}", pos_ptr);
-            if pos_ptr.is_null() {
-                pos += 1;
-                continue;
-            }
+                let mut pos_ptr = tab_cursor.offset(pos);
+                println!("Slot {:#?}", pos_ptr);
+                if pos_ptr.is_null() {
+                    pos += 1;
+                    continue;
+                }
 
-            let mut hash_ptr = *pos_ptr;
-            while !hash_ptr.is_null() {
-                let elem = hash_ptr;
-                write!(f, "({:#?} -> {}) next: {:#?}\n", elem as *mut u64, (*elem).hash, (*elem).next);
-                hash_ptr = (*elem).next;
-                idx += 1;
-            }
-            pos += 1;
+                let mut hash_ptr = *pos_ptr;
+                while !hash_ptr.is_null() {
+                    let elem = hash_ptr;
+                    write!(
+                        f,
+                        "({:#?} -> {}) next: {:#?}\n",
+                        elem as *mut u64,
+                        (*elem).hash,
+                        (*elem).next
+                    );
+                    hash_ptr = (*elem).next;
+                    idx += 1;
+                }
+                pos += 1;
             }
         }
 
@@ -139,7 +145,11 @@ mod tests {
                 next: core::ptr::null::<HNode>() as *mut HNode,
                 hash,
             });
-            unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
+            unsafe {
+                htable
+                    .insert(Box::into_raw(hnode))
+                    .expect("Failed to insert")
+            };
         }
         assert!(htable.len() == hashes.len());
         println!("{}", htable);
@@ -154,7 +164,11 @@ mod tests {
                 next: core::ptr::null::<HNode>() as *mut HNode,
                 hash,
             });
-            unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
+            unsafe {
+                htable
+                    .insert(Box::into_raw(hnode))
+                    .expect("Failed to insert")
+            };
         }
         assert!(htable.len() == hashes.len());
         println!("{}", htable);
