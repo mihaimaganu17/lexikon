@@ -13,6 +13,7 @@ struct HNode {
 #[derive(Debug, Default)]
 struct HashTable {
     // Pointer to the hashtable
+    // Should this be a `Vec<Box<HNode>>`?
     tab: *mut *mut HNode,
     // Mask to map the hash according to our desired size
     mask: usize,
@@ -64,8 +65,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_init() {
+    fn hnode_default() {
         let hnode = HNode::default();
         println!("HNode {:#?}", hnode);
+    }
+
+    #[test]
+    fn hashtable_init() {
+        let htable = HashTable::init(64).expect("Failed to init hashtable");
+        println!("HashTable {:#?}", htable);
     }
 }
