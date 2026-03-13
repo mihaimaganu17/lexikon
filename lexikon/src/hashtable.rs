@@ -34,7 +34,7 @@ impl fmt::Display for HashTable {
         while idx < self.len() && pos <= self.mask as isize {
             unsafe {
             let mut pos_ptr = tab_cursor.offset(pos);
-            println!("Pos ptr {:#?}", pos_ptr);
+            println!("Slot {:#?}", pos_ptr);
             if pos_ptr.is_null() {
                 pos += 1;
                 continue;
@@ -43,7 +43,7 @@ impl fmt::Display for HashTable {
             let mut hash_ptr = *pos_ptr;
             while !hash_ptr.is_null() {
                 let elem = hash_ptr;
-                write!(f, "({:#?} -> {}) -> {:#?}\n", elem as *mut u64, (*elem).hash, (*elem).next);
+                write!(f, "({:#?} -> {}) next: {:#?}\n", elem as *mut u64, (*elem).hash, (*elem).next);
                 hash_ptr = (*elem).next;
                 idx += 1;
             }
@@ -83,7 +83,6 @@ impl HashTable {
     pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), HashTableError> {
         // New item are inserted at the front of their respective position
         let pos = ((*node).hash & self.mask as u64) as isize;
-        println!("{:#?}", node);
         // Get the first element at that position
         unsafe {
             let next: *mut HNode = *self.tab.offset(pos);
@@ -143,7 +142,7 @@ mod tests {
             unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
         }
         assert!(htable.len() == hashes.len());
-        println!("HashTable {}", htable);
+        println!("{}", htable);
     }
 
     #[test]
@@ -158,6 +157,6 @@ mod tests {
             unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
         }
         assert!(htable.len() == hashes.len());
-        println!("HashTable {}", htable);
+        println!("{}", htable);
     }
 }
