@@ -25,21 +25,31 @@ struct HashTable {
 impl fmt::Display for HashTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut idx = 0;
-        let mut pos = 0;
+        let mut pos = 0isize;
         let tab_cursor = self.tab;
         if tab_cursor.is_null() {
             return Ok(())
         }
 
-        while idx < len && pos < mask {
+        while idx < self.len() && pos < self.mask as isize {
+            unsafe {
             let mut pos_ptr = tab_cursor.offset(pos);
-            while !pos_ptr.is_null() {
-                elem = *pos_ptr;
-                write!(f, "({})", elem.hash);
-                pos_ptr = pos_ptr.next;
+            if pos_ptr.is_null() {
+                pos += 1;
+                continue;
+            }
+
+            let mut hash_ptr = *pos_ptr;
+            while !hash_ptr.is_null() {
+                let elem = hash_ptr;
+                write!(f, "({:#?} -> {}) -> {:#?}", elem as *mut u64, (*elem).hash, (*elem).next);
+                hash_ptr = (*elem).next;
             }
             pos += 1;
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -71,6 +81,7 @@ impl HashTable {
     pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), HashTableError> {
         // New item are inserted at the front of their respective position
         let pos = ((*node).hash & self.mask as u64) as isize;
+        println!("{:#?}", node);
         // Get the first element at that position
         unsafe {
             let next: *mut HNode = *self.tab.offset(pos);
@@ -81,6 +92,11 @@ impl HashTable {
         }
         self.len += 1;
         Ok(())
+    }
+
+    /// Returns the number of keys in the hashtable
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 
@@ -118,13 +134,13 @@ mod tests {
         let hashes = [1, 2, 3, 4, 5];
         let mut htable = HashTable::init(64).expect("Failed to init hashtable");
         for hash in hashes {
-            let mut hnode = HNode {
+            let mut hnode = Box::new(HNode {
                 next: core::ptr::null::<HNode>() as *mut HNode,
                 hash,
-            };
-            unsafe { htable.insert(&mut hnode).expect("Failed to insert") };
+            });
+            unsafe { htable.insert(Box::into_raw(hnode)).expect("Failed to insert") };
         }
-        assert!(htable.len(), hashes.len());
+        assert!(htable.len() == hashes.len());
         println!("HashTable {}", htable);
     }
 }
