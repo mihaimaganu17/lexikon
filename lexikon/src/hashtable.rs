@@ -7,7 +7,7 @@ struct HNode {
     // Reference to the next node
     next: *mut HNode,
     // Hash value
-    hcode: u64,
+    hash: u64,
 }
 
 #[derive(Debug, Default)]
@@ -44,6 +44,20 @@ impl HashTable {
             mask: size - 1,
             len: 0,
         })
+    }
+
+    pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), HashTableError> {
+        // New item are inserted at the front of their respective position
+        let pos = ((*node).hash & self.mask as u64) as isize;
+        // Get the first element at that position
+        unsafe {
+            let next: *mut HNode = *self.tab.offset(pos);
+            // Make the new insert node point to it
+            (*node).next = next;
+            // Insert the new node
+            *self.tab.offset(pos) = node;
+        }
+        Ok(())
     }
 }
 
