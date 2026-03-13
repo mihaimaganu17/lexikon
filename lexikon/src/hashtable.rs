@@ -57,6 +57,7 @@ impl HashTable {
             // Insert the new node
             *self.tab.offset(pos) = node;
         }
+        self.len += 1;
         Ok(())
     }
 }
@@ -87,6 +88,21 @@ mod tests {
     #[test]
     fn hashtable_init() {
         let htable = HashTable::init(64).expect("Failed to init hashtable");
+        println!("HashTable {:#?}", htable);
+    }
+
+    #[test]
+    fn hashtable_insert() {
+        let hashes = [1, 2, 3, 4, 5];
+        let mut htable = HashTable::init(64).expect("Failed to init hashtable");
+        for hash in hashes {
+            let mut hnode = HNode {
+                next: core::ptr::null::<HNode>() as *mut HNode,
+                hash,
+            };
+            unsafe { htable.insert(&mut hnode).expect("Failed to insert") };
+        }
+        assert!(htable.len(), hashes.len());
         println!("HashTable {:#?}", htable);
     }
 }
