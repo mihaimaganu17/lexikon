@@ -86,6 +86,8 @@ impl HashTable {
         })
     }
 
+    /// Insert `node` in the hashtable in the first position that matches its hash. If the position
+    /// is already taken, `node`'s next will point to the already existing chain in the slot.
     pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), HashTableError> {
         // New item are inserted at the front of their respective position
         let pos = ((*node).hash & self.mask as u64) as isize;
@@ -99,6 +101,25 @@ impl HashTable {
         }
         self.len += 1;
         Ok(())
+    }
+
+    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*const HNode> {
+        let pos = ((*node).hash & self.mask as u64) as isize;
+
+        let slot = self.tab.offset(pos);
+
+        if slot.is_null() {
+            return None;
+        }
+
+        let mut from = *slot;
+        while !from.is_null() {
+            if (*from).hash == (*node).hash && eq(&*from, &*node) {
+                return Some(from as *const HNode);
+            }
+            from = (*from).next;
+        }
+        None
     }
 
     /// Returns the number of keys in the hashtable
