@@ -218,6 +218,13 @@ mod tests {
             hash: 3,
         });
         let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        println!("Found {:#?}", found);
+        assert!(found.is_some());
+
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 6,
+        });
+        let not_found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        assert!(not_found.is_none());
     }
 }
