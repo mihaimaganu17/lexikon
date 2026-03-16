@@ -194,4 +194,30 @@ mod tests {
         assert!(htable.len() == hashes.len());
         println!("{}", htable);
     }
+
+    #[test]
+    fn hashtable_lookup() {
+        let hashes = [1, 2, 3, 4, 5];
+        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
+        for hash in hashes {
+            let mut hnode = Box::new(HNode {
+                next: core::ptr::null::<HNode>() as *mut HNode,
+                hash,
+            });
+            unsafe {
+                htable
+                    .insert(Box::into_raw(hnode))
+                    .expect("Failed to insert")
+            };
+        }
+        fn eq(left: &HNode, right: &HNode) -> bool {
+            left.hash == right.hash
+        }
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 3,
+        });
+        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        println!("Found {:#?}", found);
+    }
 }
