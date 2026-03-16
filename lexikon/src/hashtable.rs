@@ -103,6 +103,8 @@ impl HashTable {
         Ok(())
     }
 
+    /// Search for `node` in the current hashtable, making sure the found node (if any) satifies
+    /// the `eq` equality check. If lookup does not return a node, it returns `None`.
     pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*const HNode> {
         let pos = ((*node).hash & self.mask as u64) as isize;
 
@@ -115,6 +117,7 @@ impl HashTable {
         let mut from = *slot;
         while !from.is_null() {
             if (*from).hash == (*node).hash && eq(&*from, &*node) {
+                // We might need to return the slot here in order to delete it.
                 return Some(from as *const HNode);
             }
             from = (*from).next;
@@ -216,6 +219,13 @@ mod tests {
         let mut hnode = Box::new(HNode {
             next: core::ptr::null::<HNode>() as *mut HNode,
             hash: 3,
+        });
+        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        assert!(found.is_some());
+
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 5,
         });
         let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
         assert!(found.is_some());
