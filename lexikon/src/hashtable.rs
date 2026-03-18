@@ -105,7 +105,7 @@ impl HashTable {
 
     /// Search for `node` in the current hashtable, making sure the found node (if any) satifies
     /// the `eq` equality check. If lookup does not return a node, it returns `None`.
-    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*const HNode> {
+    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*const *const HNode> {
         let pos = ((*node).hash & self.mask as u64) as isize;
 
         let slot = self.tab.offset(pos);
@@ -115,13 +115,20 @@ impl HashTable {
         }
 
         let mut from = *slot;
+        println!("Slot {:#?}", slot);
+        println!("From {:#?}", &from);
         while !from.is_null() {
             if (*from).hash == (*node).hash && eq(&*from, &*node) {
-                // We might need to return the slot here in order to delete it.
-                return Some(from as *const HNode);
+                // We might need to return the slot here in order to delete it in an easier manner.
+                return Some(&(from as *const HNode));
             }
             from = (*from).next;
         }
+        None
+    }
+
+    pub unsafe fn detach(&mut self, node: *const *const HNode) -> Option<*const HNode> {
+        // Check node is not null
         None
     }
 
@@ -236,5 +243,7 @@ mod tests {
         });
         let not_found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
         assert!(not_found.is_none());
+
+        println!("{:#?}", htable);
     }
 }
