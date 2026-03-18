@@ -212,8 +212,17 @@ impl HashMap {
         Ok(())
     }
 
-    pub fn lookup(&self, node: *const HNode) -> Option<*const HNode> {
-        None
+    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*mut HNode> {
+        // During rehashind we have to lookup for the element in both tables
+        let node = if let Some(node) = self.new.lookup(node, eq) {
+            Some(*node)
+        } else {
+            let Some(node) = self.old.lookup(node, eq) else {
+                return None;
+            };
+            Some(*node)
+        };
+        node
     }
     pub fn insert(&mut self, node: *const HNode) {}
     pub fn delete(&mut self, node: *const HNode) -> Option<*const HNode> {
