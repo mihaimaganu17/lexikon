@@ -4,15 +4,38 @@ use std::alloc::alloc_zeroed;
 use std::fmt;
 
 #[derive(Default, Debug)]
-struct HNode {
+pub struct HNode {
     // Reference to the next node
     next: *mut HNode,
     // Hash value
     hash: u64,
 }
 
+impl HNode {
+    pub fn hash(&self) -> u64 {
+        self.hash
+    }
+
+    pub fn from_hash(hash: u64) -> Self {
+        Self {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash,
+        }
+    }
+
+    /// Move self to heap and returns a raw pointer to it
+    pub fn as_ptr(self) -> *const Self {
+        Box::into_raw(Box::new(self))
+    }
+
+    /// Move self to heap and returns a raw mutable pointer to it
+    pub fn as_mut_ptr(self) -> *mut Self {
+        Box::into_raw(Box::new(self)) as *mut Self
+    }
+}
+
 #[derive(Debug, Default)]
-struct HashTable {
+pub struct HashTable {
     // Pointer to the hashtable
     // Should this be a `Vec<Box<HNode>>`?
     tab: *mut *mut HNode,
@@ -118,7 +141,6 @@ impl HashTable {
             return None;
         }
 
-        println!("Slot {:#?}", slot);
         while !(*slot).is_null() {
             if (*(*slot)).hash == (*node).hash && eq(&*(*slot), &*node) {
                 // We might need to return the slot here in order to delete it in an easier manner.
@@ -166,146 +188,5 @@ pub enum HashTableError {
 impl From<core::alloc::LayoutError> for HashTableError {
     fn from(err: core::alloc::LayoutError) -> Self {
         Self::LayoutError(err)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hnode_default() {
-        let hnode = HNode::default();
-        println!("HNode {:#?}", hnode);
-    }
-
-    #[test]
-    fn hashtable_init() {
-        let htable = HashTable::init(64).expect("Failed to init hashtable");
-        assert!(htable.mask() == 63);
-        assert!(htable.len() == 0);
-    }
-
-    #[test]
-    fn hashtable_insert() {
-        let hashes = [1, 2, 3, 4, 5];
-        let mut htable = HashTable::init(64).expect("Failed to init hashtable");
-        for hash in hashes {
-            let mut hnode = Box::new(HNode {
-                next: core::ptr::null::<HNode>() as *mut HNode,
-                hash,
-            });
-            unsafe {
-                htable
-                    .insert(Box::into_raw(hnode))
-                    .expect("Failed to insert")
-            };
-        }
-        assert!(htable.len() == hashes.len());
-    }
-
-    #[test]
-    fn hashtable_insert_chain() {
-        let hashes = [1, 2, 3, 4, 5];
-        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
-        for hash in hashes {
-            let mut hnode = Box::new(HNode {
-                next: core::ptr::null::<HNode>() as *mut HNode,
-                hash,
-            });
-            unsafe {
-                htable
-                    .insert(Box::into_raw(hnode))
-                    .expect("Failed to insert")
-            };
-        }
-        assert!(htable.len() == hashes.len());
-    }
-
-    #[test]
-    fn hashtable_lookup() {
-        let hashes = [1, 2, 3, 4, 5];
-        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
-        for hash in hashes {
-            let mut hnode = Box::new(HNode {
-                next: core::ptr::null::<HNode>() as *mut HNode,
-                hash,
-            });
-            unsafe {
-                htable
-                    .insert(Box::into_raw(hnode))
-                    .expect("Failed to insert")
-            };
-        }
-        fn eq(left: &HNode, right: &HNode) -> bool {
-            left.hash == right.hash
-        }
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 3,
-        });
-        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        assert!(found.is_some());
-
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 5,
-        });
-        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        assert!(found.is_some());
-
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 6,
-        });
-        let not_found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        assert!(not_found.is_none());
-    }
-
-    #[test]
-    fn hashtable_deletion() {
-        let hashes = [1, 2, 3, 4, 5];
-        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
-        for hash in hashes {
-            let mut hnode = Box::new(HNode {
-                next: core::ptr::null::<HNode>() as *mut HNode,
-                hash,
-            });
-            unsafe {
-                htable
-                    .insert(Box::into_raw(hnode))
-                    .expect("Failed to insert")
-            };
-        }
-        fn eq(left: &HNode, right: &HNode) -> bool {
-            left.hash == right.hash
-        }
-
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 3,
-        });
-        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        let found = found.expect("Failed to get node");
-        unsafe { htable.detach(found).expect("Failed to delete node") };
-        assert!(htable.len() == 4);
-
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 5,
-        });
-        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        let found = found.expect("Failed to get node");
-        unsafe { htable.detach(found).expect("Failed to delete node") };
-        assert!(htable.len() == 3);
-
-        let mut hnode = Box::new(HNode {
-            next: core::ptr::null::<HNode>() as *mut HNode,
-            hash: 1,
-        });
-        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
-        let found = found.expect("Failed to get node");
-        unsafe { htable.detach(found).expect("Failed to delete node") };
-        assert!(htable.len() == 2);
     }
 }

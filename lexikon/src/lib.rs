@@ -1,5 +1,5 @@
 mod event_loop;
-mod hashtable;
+pub mod hashtable;
 mod protocol;
 
 use event_loop::ParseError;
