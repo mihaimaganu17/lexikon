@@ -105,7 +105,11 @@ impl HashTable {
 
     /// Search for `node` in the current hashtable, making sure the found node (if any) satifies
     /// the `eq` equality check. If lookup does not return a node, it returns `None`.
-    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*mut *mut HNode> {
+    pub unsafe fn lookup(
+        &self,
+        node: *const HNode,
+        eq: fn(&HNode, &HNode) -> bool,
+    ) -> Option<*mut *mut HNode> {
         let pos = ((*node).hash & self.mask as u64) as isize;
 
         let mut slot = self.tab.offset(pos);
@@ -129,7 +133,7 @@ impl HashTable {
     /// already been dealocated, this panicks.
     pub unsafe fn detach(&mut self, node: *mut *mut HNode) -> Option<*const HNode> {
         // TODO: Do we really want this willy nilly approach?
-        if node.is_null() || (*node).is_null() || self.len < 1{
+        if node.is_null() || (*node).is_null() || self.len < 1 {
             return None;
         }
 
