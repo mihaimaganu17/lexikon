@@ -125,8 +125,10 @@ impl HashTable {
         None
     }
 
-    pub unsafe fn detach(&mut self, node: *mut *const HNode) -> Option<*const HNode> {
-        // Check node is not null
+    /// Delete the `node` from the hashtable. If `node` pointer is not in the has table, or has
+    /// already been dealocated, this panicks.
+    pub unsafe fn detach(&mut self, node: *mut *mut HNode) -> Option<*const HNode> {
+        // TODO: Do we really want this willy nilly approach?
         if node.is_null() || (*node).is_null() || self.len < 1{
             return None;
         }
@@ -142,6 +144,11 @@ impl HashTable {
     /// Returns the number of keys in the hashtable
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns the mask for the number of slots in the hashtable
+    pub fn mask(&self) -> usize {
+        self.mask
     }
 }
 
@@ -171,7 +178,8 @@ mod tests {
     #[test]
     fn hashtable_init() {
         let htable = HashTable::init(64).expect("Failed to init hashtable");
-        println!("HashTable {:#?}", htable);
+        assert!(htable.mask() == 63);
+        assert!(htable.len() == 0);
     }
 
     #[test]
@@ -190,7 +198,6 @@ mod tests {
             };
         }
         assert!(htable.len() == hashes.len());
-        println!("{}", htable);
     }
 
     #[test]
@@ -209,7 +216,6 @@ mod tests {
             };
         }
         assert!(htable.len() == hashes.len());
-        println!("{}", htable);
     }
 
     #[test]
@@ -250,7 +256,52 @@ mod tests {
         });
         let not_found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
         assert!(not_found.is_none());
+    }
 
-        println!("{:#?}", htable);
+    #[test]
+    fn hashtable_deletion() {
+        let hashes = [1, 2, 3, 4, 5];
+        let mut htable = HashTable::init(2).expect("Failed to init hashtable");
+        for hash in hashes {
+            let mut hnode = Box::new(HNode {
+                next: core::ptr::null::<HNode>() as *mut HNode,
+                hash,
+            });
+            unsafe {
+                htable
+                    .insert(Box::into_raw(hnode))
+                    .expect("Failed to insert")
+            };
+        }
+        fn eq(left: &HNode, right: &HNode) -> bool {
+            left.hash == right.hash
+        }
+
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 3,
+        });
+        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        let found = found.expect("Failed to get node");
+        unsafe { htable.detach(found).expect("Failed to delete node") };
+        assert!(htable.len() == 4);
+
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 5,
+        });
+        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        let found = found.expect("Failed to get node");
+        unsafe { htable.detach(found).expect("Failed to delete node") };
+        assert!(htable.len() == 3);
+
+        let mut hnode = Box::new(HNode {
+            next: core::ptr::null::<HNode>() as *mut HNode,
+            hash: 1,
+        });
+        let found = unsafe { htable.lookup(Box::into_raw(hnode), eq) };
+        let found = found.expect("Failed to get node");
+        unsafe { htable.detach(found).expect("Failed to delete node") };
+        assert!(htable.len() == 2);
     }
 }
