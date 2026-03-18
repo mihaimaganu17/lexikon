@@ -202,7 +202,7 @@ impl HashMap {
     // doubl the size of its previous size
     pub fn trigger_rehashing(&mut self) -> Result<(), HashMapError> {
         // Make sure old was deallocated
-        if self.old.len() != 0{
+        if self.old.len() != 0 {
             return Err(HashMapError::OldTableNotEmpty(self.old.len()));
         }
         self.old = self.new;
@@ -212,7 +212,11 @@ impl HashMap {
         Ok(())
     }
 
-    pub unsafe fn lookup(&self, node: *const HNode, eq: fn(&HNode, &HNode) -> bool) -> Option<*mut HNode> {
+    pub unsafe fn lookup(
+        &self,
+        node: *const HNode,
+        eq: fn(&HNode, &HNode) -> bool,
+    ) -> Option<*mut HNode> {
         // During rehashind we have to lookup for the element in both tables
         let node = if let Some(node) = self.new.lookup(node, eq) {
             Some(*node)
@@ -229,7 +233,6 @@ impl HashMap {
         None
     }
 }
-
 
 #[derive(Debug)]
 pub enum HashTableError {

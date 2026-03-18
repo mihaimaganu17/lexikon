@@ -19,11 +19,7 @@ fn hashtable_insert() {
     let mut htable = HashTable::init(64).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
-        unsafe {
-            htable
-                .insert(hnode)
-                .expect("Failed to insert")
-        };
+        unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
     assert!(htable.len() == hashes.len());
 }
@@ -34,11 +30,7 @@ fn hashtable_insert_chain() {
     let mut htable = HashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
-        unsafe {
-            htable
-                .insert(hnode)
-                .expect("Failed to insert")
-        };
+        unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
     assert!(htable.len() == hashes.len());
 }
@@ -49,11 +41,7 @@ fn hashtable_lookup() {
     let mut htable = HashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
-        unsafe {
-            htable
-                .insert(hnode)
-                .expect("Failed to insert")
-        };
+        unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
     fn eq(left: &HNode, right: &HNode) -> bool {
         left.hash() == right.hash()
@@ -77,11 +65,7 @@ fn hashtable_deletion() {
     let mut htable = HashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
-        unsafe {
-            htable
-                .insert(hnode)
-                .expect("Failed to insert")
-        };
+        unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
     fn eq(left: &HNode, right: &HNode) -> bool {
         left.hash() == right.hash()
