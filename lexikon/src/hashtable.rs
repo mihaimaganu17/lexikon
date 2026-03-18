@@ -125,9 +125,18 @@ impl HashTable {
         None
     }
 
-    pub unsafe fn detach(&mut self, node: *const *const HNode) -> Option<*const HNode> {
+    pub unsafe fn detach(&mut self, node: *mut *const HNode) -> Option<*const HNode> {
         // Check node is not null
-        None
+        if node.is_null() || (*node).is_null() || self.len < 1{
+            return None;
+        }
+
+        let to_return = *node;
+
+        (*node) = (*(*node)).next;
+        self.len -= 1;
+
+        Some(to_return)
     }
 
     /// Returns the number of keys in the hashtable
