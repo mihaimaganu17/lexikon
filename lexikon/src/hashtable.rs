@@ -34,7 +34,7 @@ impl HNode {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct HashTable {
     // Pointer to the hashtable
     // Should this be a `Vec<Box<HNode>>`?
@@ -178,6 +178,50 @@ impl HashTable {
     }
 }
 
+/// A resizable hashmap based on the fixed-size `HashTable`. It contains 2 of them for the
+/// progressive rehashing.
+///
+/// There are 2 types of scalability problems: throughput and latency.
+/// Throughput problems have generic solutions, such as sharding and read_only replicas and are an
+/// average case problem.
+/// Latency problems are often domain-specific and harder, being a worst-case problem.
+///
+/// For hashtables, the largest latency issues comes from insertion, which may trigger an O(N)
+/// resize. The solution to this problem is to do it progressively. After allocating the new
+/// hashtable, only move a fixed number of keys and each time the hashtable is used, move some
+/// more keys. This can slow down lookups during resizing because there are 2 hashtables to query.
+#[derive(Debug, Default)]
+pub struct HashMap {
+    new: HashTable,
+    old: HashTable,
+    migrate_pos: usize,
+}
+
+impl HashMap {
+    // When the load factor is too high, the `new` hash map is marked as `old` reallocated as
+    // doubl the size of its previous size
+    pub fn trigger_rehashing(&mut self) -> Result<(), HashMapError> {
+        // Make sure old was deallocated
+        if self.old.len() != 0{
+            return Err(HashMapError::OldTableNotEmpty(self.old.len()));
+        }
+        self.old = self.new;
+        self.new = HashTable::init((self.new.mask() + 1) << 2)?;
+        self.migrate_pos = 0;
+
+        Ok(())
+    }
+
+    pub fn lookup(&self, node: *const HNode) -> Option<*const HNode> {
+        None
+    }
+    pub fn insert(&mut self, node: *const HNode) {}
+    pub fn delete(&mut self, node: *const HNode) -> Option<*const HNode> {
+        None
+    }
+}
+
+
 #[derive(Debug)]
 pub enum HashTableError {
     NegativeSize,
@@ -188,5 +232,17 @@ pub enum HashTableError {
 impl From<core::alloc::LayoutError> for HashTableError {
     fn from(err: core::alloc::LayoutError) -> Self {
         Self::LayoutError(err)
+    }
+}
+
+#[derive(Debug)]
+pub enum HashMapError {
+    OldTableNotEmpty(usize),
+    HashTableError(HashTableError),
+}
+
+impl From<HashTableError> for HashMapError {
+    fn from(err: HashTableError) -> Self {
+        Self::HashTableError(err)
     }
 }
