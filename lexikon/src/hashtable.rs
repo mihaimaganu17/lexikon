@@ -228,9 +228,22 @@ impl HashMap {
         };
         node
     }
-    pub fn insert(&mut self, node: *const HNode) {}
-    pub fn delete(&mut self, node: *const HNode) -> Option<*const HNode> {
-        None
+    pub fn insert(&mut self, node: *const HNode) {
+    }
+
+    pub unsafe fn delete(&mut self,
+        node: *const HNode,
+        eq: fn(&HNode, &HNode) -> bool,
+    ) -> Option<*const HNode> {
+        if let Some(node) = self.old.lookup(node, eq) {
+            self.old.detach(node)
+        } else {
+            if let Some(node) = self.new.lookup(node, eq) {
+                self.new.detach(node)
+            } else {
+                None
+            }
+        }
     }
 }
 
