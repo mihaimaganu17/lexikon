@@ -199,7 +199,9 @@ pub struct HashMap {
 }
 
 /// The maximum number of keys a single slot can hold.
-const KMAX_LOAD_FACTOR: usize = 8;
+const K_MAX_LOAD_FACTOR: usize = 8;
+/// The number of keys to rehash after the table has been rehashed
+const K_REHASHING_WORK: usize = 128;
 
 impl HashMap {
     // When the load factor is too high, the `new` hash map is marked as `old` reallocated as
@@ -217,7 +219,27 @@ impl HashMap {
         Ok(())
     }
 
-    pub fn help_rehashing(&mut self) -> Result<(), HashMapError> {
+    pub unsafe fn help_rehashing(&mut self) -> Result<(), HashMapError> {
+        let mut keys_moved = 0;
+
+        if let Some(mut old) = self.old {
+            while keys_moved < K_REHASHING_WORK && old.len() > 0 {
+                // Find an non-empty slot.
+                let from = old.tab.offset(self.migrate_pos as isize);
+                self.migrate_pos += 1;
+                if from.is_null() {
+                    continue;
+                }
+
+                // Move the first lsit item to the newer table
+                self.new.insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)?;
+                keys_moved += 1;
+            }
+            if old.len() == 0 {
+                self.old = None
+            }
+        }
+
         Ok(())
     }
 
@@ -248,7 +270,7 @@ impl HashMap {
         // Check if we need to rehash.
         if let None = self.old {
             // Check if we reached our threshold
-            let threshold = (self.new.mask() + 1) * KMAX_LOAD_FACTOR;
+            let threshold = (self.new.mask() + 1) * K_MAX_LOAD_FACTOR;
             // If the current number of keys is greater, trigger rehashing
             if self.new.len() >= threshold {
                 self.trigger_rehashing()?;
@@ -295,6 +317,7 @@ impl From<core::alloc::LayoutError> for HashTableError {
 pub enum HashMapError {
     OldTableNotEmpty(usize),
     HashTableError(HashTableError),
+    NodeNotFound,
 }
 
 impl From<HashTableError> for HashMapError {
