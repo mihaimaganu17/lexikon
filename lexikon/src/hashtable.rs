@@ -178,6 +178,7 @@ impl HashTable {
     }
 }
 
+
 /// A resizable hashmap based on the fixed-size `HashTable`. It contains 2 of them for the
 /// progressive rehashing.
 ///
@@ -193,22 +194,30 @@ impl HashTable {
 #[derive(Debug, Default)]
 pub struct HashMap {
     new: HashTable,
-    old: HashTable,
+    old: Option<HashTable>,
     migrate_pos: usize,
 }
+
+/// The maximum number of keys a single slot can hold.
+const KMAX_LOAD_FACTOR: usize = 8;
 
 impl HashMap {
     // When the load factor is too high, the `new` hash map is marked as `old` reallocated as
     // doubl the size of its previous size
     pub fn trigger_rehashing(&mut self) -> Result<(), HashMapError> {
         // Make sure old was deallocated
-        if self.old.len() != 0 {
-            return Err(HashMapError::OldTableNotEmpty(self.old.len()));
+        if let Some(old) = self.old {
+            return Err(HashMapError::OldTableNotEmpty(old.len()));
         }
-        self.old = self.new;
+
+        self.old = Some(self.new);
         self.new = HashTable::init((self.new.mask() + 1) << 2)?;
         self.migrate_pos = 0;
 
+        Ok(())
+    }
+
+    pub fn help_rehashing(&mut self) -> Result<(), HashMapError> {
         Ok(())
     }
 
@@ -221,25 +230,47 @@ impl HashMap {
         let node = if let Some(node) = self.new.lookup(node, eq) {
             Some(*node)
         } else {
-            let Some(node) = self.old.lookup(node, eq) else {
+            let Some(old) = self.old else {
+                return None;
+            };
+            let Some(node) = old.lookup(node, eq) else {
                 return None;
             };
             Some(*node)
         };
         node
     }
-    pub fn insert(&mut self, node: *const HNode) {
+
+    pub unsafe fn insert(&mut self, node: *const HNode) -> Result<(), HashMapError> {
+        // Always insert in the new table
+        self.new.insert(node as *mut HNode)?;
+
+        // Check if we need to rehash.
+        if let None = self.old {
+            // Check if we reached our threshold
+            let threshold = (self.new.mask() + 1) * KMAX_LOAD_FACTOR;
+            // If the current number of keys is greater, trigger rehashing
+            if self.new.len() >= threshold {
+                self.trigger_rehashing()?;
+            }
+        }
+
+        // Move some keys between the 2 tables
+        self.help_rehashing()
     }
 
     pub unsafe fn delete(&mut self,
         node: *const HNode,
         eq: fn(&HNode, &HNode) -> bool,
     ) -> Option<*const HNode> {
-        if let Some(node) = self.old.lookup(node, eq) {
-            self.old.detach(node)
+        if let Some(node) = self.new.lookup(node, eq) {
+            self.new.detach(node)
         } else {
-            if let Some(node) = self.new.lookup(node, eq) {
-                self.new.detach(node)
+            let Some(mut old) = self.old else {
+                return None;
+            };
+            if let Some(node) = old.lookup(node, eq) {
+                old.detach(node)
             } else {
                 None
             }
