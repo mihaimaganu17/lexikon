@@ -35,7 +35,7 @@ impl HNode {
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct HashTable {
+pub struct InnerHashTable {
     // Pointer to the hashtable
     // Should this be a `Vec<Box<HNode>>`?
     tab: *mut *mut HNode,
@@ -45,7 +45,7 @@ pub struct HashTable {
     len: usize,
 }
 
-impl fmt::Display for HashTable {
+impl fmt::Display for InnerHashTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut idx = 0;
         let mut pos = 0isize;
@@ -84,15 +84,15 @@ impl fmt::Display for HashTable {
     }
 }
 
-impl HashTable {
-    pub fn init(size: usize) -> Result<Self, HashTableError> {
+impl InnerHashTable {
+    pub fn init(size: usize) -> Result<Self, InnerHashTableError> {
         // Make sure the size is not 0 or negative. `usize` prevents this but we are extra
         if size <= 0 {
-            return Err(HashTableError::NegativeSize);
+            return Err(InnerHashTableError::NegativeSize);
         }
         // Make sure size is a power of 2
         if size - 1 & size != 0 {
-            return Err(HashTableError::SizeNotPowerOfTwo(size));
+            return Err(InnerHashTableError::SizeNotPowerOfTwo(size));
         }
 
         let layout = Layout::from_size_align(
@@ -111,7 +111,7 @@ impl HashTable {
 
     /// Insert `node` in the hashtable in the first position that matches its hash. If the position
     /// is already taken, `node`'s next will point to the already existing chain in the slot.
-    pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), HashTableError> {
+    pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), InnerHashTableError> {
         // New item are inserted at the front of their respective position
         let pos = ((*node).hash & self.mask as u64) as isize;
         // Get the first element at that position
@@ -178,7 +178,7 @@ impl HashTable {
     }
 }
 
-/// A resizable hashmap based on the fixed-size `HashTable`. It contains 2 of them for the
+/// A resizable hashmap based on the fixed-size `InnerHashTable`. It contains 2 of them for the
 /// progressive rehashing.
 ///
 /// There are 2 types of scalability problems: throughput and latency.
@@ -192,8 +192,8 @@ impl HashTable {
 /// more keys. This can slow down lookups during resizing because there are 2 hashtables to query.
 #[derive(Debug, Default)]
 pub struct HashMap {
-    new: HashTable,
-    old: Option<HashTable>,
+    new: InnerHashTable,
+    old: Option<InnerHashTable>,
     migrate_pos: usize,
 }
 
@@ -212,7 +212,7 @@ impl HashMap {
         }
 
         self.old = Some(self.new);
-        self.new = HashTable::init((self.new.mask() + 1) << 2)?;
+        self.new = InnerHashTable::init((self.new.mask() + 1) << 2)?;
         self.migrate_pos = 0;
 
         Ok(())
@@ -301,14 +301,15 @@ impl HashMap {
     }
 }
 
+
 #[derive(Debug)]
-pub enum HashTableError {
+pub enum InnerHashTableError {
     NegativeSize,
     SizeNotPowerOfTwo(usize),
     LayoutError(core::alloc::LayoutError),
 }
 
-impl From<core::alloc::LayoutError> for HashTableError {
+impl From<core::alloc::LayoutError> for InnerHashTableError {
     fn from(err: core::alloc::LayoutError) -> Self {
         Self::LayoutError(err)
     }
@@ -317,12 +318,12 @@ impl From<core::alloc::LayoutError> for HashTableError {
 #[derive(Debug)]
 pub enum HashMapError {
     OldTableNotEmpty(usize),
-    HashTableError(HashTableError),
+    InnerHashTableError(InnerHashTableError),
     NodeNotFound,
 }
 
-impl From<HashTableError> for HashMapError {
-    fn from(err: HashTableError) -> Self {
-        Self::HashTableError(err)
+impl From<InnerHashTableError> for HashMapError {
+    fn from(err: InnerHashTableError) -> Self {
+        Self::InnerHashTableError(err)
     }
 }

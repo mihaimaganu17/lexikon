@@ -1,4 +1,4 @@
-use lexikon::hashtable::{HNode, HashTable};
+use lexikon::hashtable::{HNode, InnerHashTable};
 
 #[test]
 fn hnode_default() {
@@ -8,7 +8,7 @@ fn hnode_default() {
 
 #[test]
 fn hashtable_init() {
-    let htable = HashTable::init(64).expect("Failed to init hashtable");
+    let htable = InnerHashTable::init(64).expect("Failed to init hashtable");
     assert!(htable.mask() == 63);
     assert!(htable.len() == 0);
 }
@@ -16,7 +16,7 @@ fn hashtable_init() {
 #[test]
 fn hashtable_insert() {
     let hashes = [1, 2, 3, 4, 5];
-    let mut htable = HashTable::init(64).expect("Failed to init hashtable");
+    let mut htable = InnerHashTable::init(64).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
         unsafe { htable.insert(hnode).expect("Failed to insert") };
@@ -27,7 +27,7 @@ fn hashtable_insert() {
 #[test]
 fn hashtable_insert_chain() {
     let hashes = [1, 2, 3, 4, 5];
-    let mut htable = HashTable::init(2).expect("Failed to init hashtable");
+    let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
         unsafe { htable.insert(hnode).expect("Failed to insert") };
@@ -38,7 +38,7 @@ fn hashtable_insert_chain() {
 #[test]
 fn hashtable_lookup() {
     let hashes = [1, 2, 3, 4, 5];
-    let mut htable = HashTable::init(2).expect("Failed to init hashtable");
+    let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
         unsafe { htable.insert(hnode).expect("Failed to insert") };
@@ -62,7 +62,7 @@ fn hashtable_lookup() {
 #[test]
 fn hashtable_deletion() {
     let hashes = [1, 2, 3, 4, 5];
-    let mut htable = HashTable::init(2).expect("Failed to init hashtable");
+    let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
         unsafe { htable.insert(hnode).expect("Failed to insert") };
