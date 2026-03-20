@@ -178,7 +178,6 @@ impl HashTable {
     }
 }
 
-
 /// A resizable hashmap based on the fixed-size `HashTable`. It contains 2 of them for the
 /// progressive rehashing.
 ///
@@ -232,7 +231,8 @@ impl HashMap {
                 }
 
                 // Move the first lsit item to the newer table
-                self.new.insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)?;
+                self.new
+                    .insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)?;
                 keys_moved += 1;
             }
             if old.len() == 0 {
@@ -281,7 +281,8 @@ impl HashMap {
         self.help_rehashing()
     }
 
-    pub unsafe fn delete(&mut self,
+    pub unsafe fn delete(
+        &mut self,
         node: *const HNode,
         eq: fn(&HNode, &HNode) -> bool,
     ) -> Option<*const HNode> {
