@@ -22,7 +22,9 @@ macro_rules! field_ptr {
 
 macro_rules! container_of {
     ($field_ptr:expr, $base_type:path, $field:tt) => {{
-        core::ptr::null_mut()
+        let field_offset = offset_of!($base_type, $field);
+        let base_ptr = unsafe { ($field_ptr as *const u8).sub(field_offset as usize) as *mut $base_type };
+        base_ptr
     }};
 }
 
@@ -50,9 +52,11 @@ mod tests {
         }
 
         let entry_orig_ptr = Box::into_raw(Box::new(Entry { before_node: 0xa01e0, node:node_ptr }));
+        let node_ptr = unsafe { (*entry_orig_ptr).node };
 
         let entry_container: *mut Entry = container_of!(node_ptr, Entry, node);
         println!("{:#?}", entry_orig_ptr);
+        println!("{:#?}", node_ptr);
         println!("{:#?}", entry_container);
 
         assert!(entry_orig_ptr == entry_container);
