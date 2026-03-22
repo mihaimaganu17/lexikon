@@ -21,7 +21,9 @@ struct Entry {
 }
 
 
-impl Entry {}
+
+impl Entry {
+}
 
 #[derive(Default, Debug)]
 pub struct HNode {

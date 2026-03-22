@@ -1,8 +1,6 @@
-use core::mem::MaybeUninit;
-
 macro_rules! offset_of {
     ($base:path, $field:tt) => {{
-        let base_type = MaybeUninit::<$base>::uninit();
+        let base_type = core::mem::MaybeUninit::<$base>::uninit();
         let base_ptr = base_type.as_ptr();
         let field_ptr = field_ptr!(base_ptr, $base, $field);
         let diff: isize = unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) };
@@ -31,8 +29,6 @@ macro_rules! container_of {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn container_of() {
         #[repr(C)]
@@ -56,8 +52,6 @@ mod tests {
         let node_ptr = unsafe { &(*entry_orig_ptr).node as *const Node};
 
         let entry_container: *mut Entry = container_of!(node_ptr, Entry, node);
-        println!("{:#?}", entry_orig_ptr);
-        println!("{:#?}", entry_container);
 
         assert!(entry_orig_ptr == entry_container);
     }
@@ -69,11 +63,6 @@ mod tests {
             a: u32,
             b: u32,
         }
-
-        let node: *mut Node = Box::into_raw(Box::new(Node {
-            a: 0xb00b,
-            b: 0x1337,
-        }));
 
         #[repr(C)]
         struct Entry {
