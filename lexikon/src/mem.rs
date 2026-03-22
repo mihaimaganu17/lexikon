@@ -40,23 +40,22 @@ mod tests {
             b: u32,
         }
 
-        let node_ptr: *mut Node = Box::into_raw(Box::new(Node {
+        let node = Node {
             a: 0xb00b,
             b: 0x1337,
-        }));
+        };
 
         #[repr(C)]
         struct Entry {
             before_node: u64,
-            node: *mut Node,
+            node: Node,
         }
 
-        let entry_orig_ptr = Box::into_raw(Box::new(Entry { before_node: 0xa01e0, node:node_ptr }));
-        let node_ptr = unsafe { (*entry_orig_ptr).node };
+        let entry_orig_ptr = Box::into_raw(Box::new(Entry { before_node: 0xa01e0, node }));
+        let node_ptr = unsafe { &(*entry_orig_ptr).node as *const Node};
 
         let entry_container: *mut Entry = container_of!(node_ptr, Entry, node);
         println!("{:#?}", entry_orig_ptr);
-        println!("{:#?}", node_ptr);
         println!("{:#?}", entry_container);
 
         assert!(entry_orig_ptr == entry_container);
