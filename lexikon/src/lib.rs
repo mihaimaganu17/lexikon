@@ -11,6 +11,8 @@ unsafe extern "C" {
     // option_len is a value-result parameter, initially containing the size of the buffer pointed
     // to by option_value, and modified on return to indicate the actual size of the value
     // returned.  If no option value is to be supplied or returned, option_value may be NULL.
+    // TODO: used for testing
+    #[allow(unused)]
     fn getsockopt(
         socket: i32,
         level: i32,

@@ -73,9 +73,9 @@ mod poll_flags {
     // Some poll error occured
     pub const POLLERR: u16 = 0x0008;
     // File descriptor was "hung up"
-    pub const POLLHUP: u16 = 0x0010;
+    pub const _POLLHUP: u16 = 0x0010;
     // Requested events "invalid"
-    pub const POLLNVAL: u16 = 0x0020;
+    pub const _POLLNVAL: u16 = 0x0020;
 }
 
 #[derive(Debug)]

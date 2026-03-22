@@ -5,12 +5,13 @@ use std::fmt;
 
 #[derive(Default, Debug)]
 pub struct HashTable {
-    inner: HashMap,
+    _inner: HashMap,
 }
 
 // KV pair with an embedded hashtable node.
 #[derive(Default, Debug)]
 #[repr(C)]
+#[allow(unused)]
 struct Entry {
     node: *mut HNode,
     // Key and Value need to be generic
@@ -114,7 +115,7 @@ impl fmt::Display for InnerHashTable {
         while idx < self.len() && pos <= self.mask as isize {
             unsafe {
                 let pos_ptr = tab_cursor.offset(pos);
-                write!(f, "Slot {:#?}", pos_ptr);
+                write!(f, "Slot {:#?}", pos_ptr)?;
                 if pos_ptr.is_null() {
                     pos += 1;
                     continue;
@@ -129,7 +130,7 @@ impl fmt::Display for InnerHashTable {
                         elem as *mut u64,
                         (*elem).hash,
                         (*elem).next
-                    );
+                    )?;
                     hash_ptr = (*elem).next;
                     idx += 1;
                 }

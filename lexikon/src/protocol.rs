@@ -33,6 +33,7 @@ impl LexRequest {
 }
 
 // TODO
+#[allow(unused)]
 pub struct LexResponse {}
 
 #[derive(Debug)]
