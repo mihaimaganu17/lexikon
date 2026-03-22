@@ -20,6 +20,7 @@ macro_rules! field_ptr {
     }};
 }
 
+#[macro_export]
 macro_rules! container_of {
     ($field_ptr:expr, $base_type:path, $field:tt) => {{
         let field_offset = offset_of!($base_type, $field);

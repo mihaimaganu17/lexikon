@@ -2,6 +2,7 @@
 use core::alloc::Layout;
 use std::alloc::alloc_zeroed;
 use std::fmt;
+use crate::container_of;
 
 #[derive(Default, Debug)]
 pub struct HashTable {
