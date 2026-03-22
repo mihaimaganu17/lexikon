@@ -290,8 +290,10 @@ impl HashMap {
                 }
 
                 // Move the first lsit item to the newer table
-                unsafe { self.new
-                    .insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)? };
+                unsafe {
+                    self.new
+                        .insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)?
+                };
                 keys_moved += 1;
             }
             if old.len() == 0 {
@@ -317,7 +319,7 @@ impl HashMap {
             let Some(node) = (unsafe { old.lookup(node, eq) }) else {
                 return None;
             };
-            Some(unsafe { *node  })
+            Some(unsafe { *node })
         };
         node
     }
