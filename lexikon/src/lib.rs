@@ -1,4 +1,5 @@
 mod event_loop;
+mod mem;
 pub mod hashtable;
 mod protocol;
 
