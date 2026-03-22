@@ -24,6 +24,9 @@ impl PartialEq for HNode {
     fn eq(&self, other: &Self) -> bool {
         let lhs = container_of!(self as *const HNode, Entry, node);
         let rhs = container_of!(other as *const HNode, Entry, node);
+        if lhs.is_null() || rhs.is_null() {
+            return false;
+        }
         unsafe { (*lhs).key == (*rhs).key }
     }
 }
