@@ -4,6 +4,63 @@ use std::alloc::alloc_zeroed;
 use std::fmt;
 
 #[derive(Default, Debug)]
+pub struct HashTable {
+    inner: HashMap,
+}
+
+// KV pair with an embedded hashtable node.
+#[derive(Default, Debug)]
+#[repr(C)]
+struct Entry {
+    node: *mut HNode,
+    // Key and Value need to be generic
+    key: String,
+    value: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use core::mem::MaybeUninit;
+
+    macro_rules! init_base {
+        ($base:path) => {{
+            let base_type = MaybeUninit::<$base>::uninit();
+            let base_ptr = base_type.as_ptr();
+            println!("Base ptr: {:#?}", base_ptr);
+        }};
+    }
+    #[test]
+    fn test_container() {
+        #[repr(C)]
+        struct Node {
+            a: u32,
+            b: u32,
+        }
+
+        let node: *mut Node = Box::into_raw(Box::new(Node {
+            a: 0xb00b,
+            b: 0x1337,
+        }));
+
+        #[repr(C)]
+        struct Entry {
+            before_node: u64,
+            node: Node,
+            after_node: u64,
+        }
+
+        // 1. Maybe uninit entry -> Get it's memory ptr
+        // 2. Check if the field is in entry
+        // 3. Get the memory pointer of the field
+        println!("Node pointer {:#?}", node);
+
+        init_base!(Entry);
+    }
+}
+
+impl Entry {}
+
+#[derive(Default, Debug)]
 pub struct HNode {
     // Reference to the next node
     next: *mut HNode,
@@ -56,8 +113,8 @@ impl fmt::Display for InnerHashTable {
 
         while idx < self.len() && pos <= self.mask as isize {
             unsafe {
-                let mut pos_ptr = tab_cursor.offset(pos);
-                println!("Slot {:#?}", pos_ptr);
+                let pos_ptr = tab_cursor.offset(pos);
+                write!(f, "Slot {:#?}", pos_ptr);
                 if pos_ptr.is_null() {
                     pos += 1;
                     continue;
@@ -113,7 +170,7 @@ impl InnerHashTable {
     /// is already taken, `node`'s next will point to the already existing chain in the slot.
     pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), InnerHashTableError> {
         // New item are inserted at the front of their respective position
-        let pos = ((*node).hash & self.mask as u64) as isize;
+        let pos = unsafe { ((*node).hash & self.mask as u64) as isize };
         // Get the first element at that position
         unsafe {
             let next: *mut HNode = *self.tab.offset(pos);
@@ -133,20 +190,21 @@ impl InnerHashTable {
         node: *const HNode,
         eq: fn(&HNode, &HNode) -> bool,
     ) -> Option<*mut *mut HNode> {
-        let pos = ((*node).hash & self.mask as u64) as isize;
+        let pos = unsafe { ((*node).hash & self.mask as u64) as isize };
 
-        let mut slot = self.tab.offset(pos);
+        let mut slot = unsafe { self.tab.offset(pos) };
 
         if slot.is_null() {
             return None;
         }
 
-        while !(*slot).is_null() {
-            if (*(*slot)).hash == (*node).hash && eq(&*(*slot), &*node) {
-                // We might need to return the slot here in order to delete it in an easier manner.
-                return Some(slot);
+        unsafe {
+            while !(*slot).is_null() {
+                if (*(*slot)).hash == (*node).hash && eq(&*(*slot), &*node) {
+                    return Some(slot);
+                }
+                slot = (&mut (*(*slot)).next) as *mut *mut HNode;
             }
-            slot = (&mut (*(*slot)).next) as *mut *mut HNode;
         }
         None
     }
@@ -155,13 +213,13 @@ impl InnerHashTable {
     /// already been dealocated, this panicks.
     pub unsafe fn detach(&mut self, node: *mut *mut HNode) -> Option<*const HNode> {
         // TODO: Do we really want this willy nilly approach?
-        if node.is_null() || (*node).is_null() || self.len < 1 {
+        if node.is_null() || (unsafe { *node }).is_null() || self.len < 1 {
             return None;
         }
 
-        let to_return = *node;
+        let to_return = unsafe { *node };
 
-        (*node) = (*(*node)).next;
+        unsafe { *node = (*(*node)).next };
         self.len -= 1;
 
         Some(to_return)
@@ -224,15 +282,15 @@ impl HashMap {
         if let Some(mut old) = self.old {
             while keys_moved < K_REHASHING_WORK && old.len() > 0 {
                 // Find an non-empty slot.
-                let from = old.tab.offset(self.migrate_pos as isize);
+                let from = unsafe { old.tab.offset(self.migrate_pos as isize) };
                 self.migrate_pos += 1;
                 if from.is_null() {
                     continue;
                 }
 
                 // Move the first lsit item to the newer table
-                self.new
-                    .insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)?;
+                unsafe { self.new
+                    .insert(old.detach(from).ok_or(HashMapError::NodeNotFound)? as *mut HNode)? };
                 keys_moved += 1;
             }
             if old.len() == 0 {
@@ -249,23 +307,23 @@ impl HashMap {
         eq: fn(&HNode, &HNode) -> bool,
     ) -> Option<*mut HNode> {
         // During rehashind we have to lookup for the element in both tables
-        let node = if let Some(node) = self.new.lookup(node, eq) {
-            Some(*node)
+        let node = if let Some(node) = unsafe { self.new.lookup(node, eq) } {
+            Some(unsafe { *node })
         } else {
             let Some(old) = self.old else {
                 return None;
             };
-            let Some(node) = old.lookup(node, eq) else {
+            let Some(node) = (unsafe { old.lookup(node, eq) }) else {
                 return None;
             };
-            Some(*node)
+            Some(unsafe { *node  })
         };
         node
     }
 
     pub unsafe fn insert(&mut self, node: *const HNode) -> Result<(), HashMapError> {
         // Always insert in the new table
-        self.new.insert(node as *mut HNode)?;
+        unsafe { self.new.insert(node as *mut HNode)? };
 
         // Check if we need to rehash.
         if let None = self.old {
@@ -278,7 +336,7 @@ impl HashMap {
         }
 
         // Move some keys between the 2 tables
-        self.help_rehashing()
+        unsafe { self.help_rehashing() }
     }
 
     pub unsafe fn delete(
@@ -286,21 +344,20 @@ impl HashMap {
         node: *const HNode,
         eq: fn(&HNode, &HNode) -> bool,
     ) -> Option<*const HNode> {
-        if let Some(node) = self.new.lookup(node, eq) {
-            self.new.detach(node)
+        if let Some(node) = unsafe { self.new.lookup(node, eq) } {
+            unsafe { self.new.detach(node) }
         } else {
             let Some(mut old) = self.old else {
                 return None;
             };
-            if let Some(node) = old.lookup(node, eq) {
-                old.detach(node)
+            if let Some(node) = unsafe { old.lookup(node, eq) } {
+                unsafe { old.detach(node) }
             } else {
                 None
             }
         }
     }
 }
-
 
 #[derive(Debug)]
 pub enum InnerHashTableError {

@@ -225,7 +225,7 @@ pub fn run_server() -> Result<(), ServerError> {
         for poll_fd in poll_args.iter().skip(1) {
             // We get the connection at the index of the fd
             let conn_idx = usize::try_from(poll_fd.fd)?;
-            let mut maybe_conn = fd2conn
+            let maybe_conn = fd2conn
                 .get_mut(conn_idx)
                 .ok_or(ReadError::InvalidIdx(conn_idx))?
                 .take();
