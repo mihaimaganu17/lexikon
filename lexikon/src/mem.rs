@@ -1,13 +1,15 @@
+#[macro_export]
 macro_rules! offset_of {
     ($base:path, $field:tt) => {{
         let base_type = core::mem::MaybeUninit::<$base>::uninit();
         let base_ptr = base_type.as_ptr();
-        let field_ptr = field_ptr!(base_ptr, $base, $field);
+        let field_ptr = $crate::field_ptr!(base_ptr, $base, $field);
         let diff: isize = unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) };
         diff
     }};
 }
 
+#[macro_export]
 macro_rules! field_ptr {
     ($base_ptr:expr, $base_type:path, $field:tt) => {{
         // Check the field is in the base type. This issues a compile time error if `$field` is not
@@ -21,7 +23,7 @@ macro_rules! field_ptr {
 #[macro_export]
 macro_rules! container_of {
     ($field_ptr:expr, $base_type:path, $field:tt) => {{
-        let field_offset = offset_of!($base_type, $field);
+        let field_offset = $crate::offset_of!($base_type, $field);
         let base_ptr = unsafe { ($field_ptr as *const u8).sub(field_offset as usize) as *mut $base_type };
         base_ptr
     }};

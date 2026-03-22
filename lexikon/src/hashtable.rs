@@ -14,13 +14,19 @@ pub struct HashTable {
 #[repr(C)]
 #[allow(unused)]
 struct Entry {
-    node: *mut HNode,
+    node: HNode,
     // Key and Value need to be generic
     key: String,
     value: String,
 }
 
-
+impl PartialEq for HNode {
+    fn eq(&self, other: &Self) -> bool {
+        let lhs = container_of!(self as *const HNode, Entry, node);
+        let rhs = container_of!(other as *const HNode, Entry, node);
+        unsafe { (*lhs).key == (*rhs).key }
+    }
+}
 
 impl Entry {
 }
