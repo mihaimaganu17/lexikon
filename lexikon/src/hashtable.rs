@@ -23,13 +23,23 @@ struct Entry {
 mod tests {
     use core::mem::MaybeUninit;
 
-    macro_rules! init_base {
-        ($base:path) => {{
+    macro_rules! offset_of {
+        ($base:path, $field:tt) => {{
             let base_type = MaybeUninit::<$base>::uninit();
             let base_ptr = base_type.as_ptr();
-            println!("Base ptr: {:#?}", base_ptr);
+            let field_ptr = field_ptr!(base_ptr, $base, $field);
+            let diff: isize = unsafe { (field_ptr as *const u8).offset_from(base_ptr as *const u8) };
+            diff
         }};
     }
+
+    macro_rules! field_ptr {
+        ($base_ptr:expr, $base_type:path, $field:tt) => {{
+            let field_ptr = unsafe { &raw const (*($base_ptr as *const $base_type)).$field };
+            field_ptr
+        }};
+    }
+
     #[test]
     fn test_container() {
         #[repr(C)]
@@ -48,6 +58,7 @@ mod tests {
             before_node: u64,
             node: Node,
             after_node: u64,
+            more_after: u8,
         }
 
         // 1. Maybe uninit entry -> Get it's memory ptr
@@ -55,7 +66,9 @@ mod tests {
         // 3. Get the memory pointer of the field
         println!("Node pointer {:#?}", node);
 
-        init_base!(Entry);
+        assert!(offset_of!(Entry, after_node) == 16);
+        assert!(offset_of!(Entry, before_node) == 0);
+        assert!(offset_of!(Entry, more_after) == 24);
     }
 }
 
