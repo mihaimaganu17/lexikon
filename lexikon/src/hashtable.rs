@@ -9,6 +9,29 @@ pub struct HashTable {
     _inner: HashMap,
 }
 
+impl HashTable {
+    pub fn new() -> Self {
+        Self {
+            _inner: HashMap::default()
+        }
+    }
+
+    pub fn insert(&mut self, key: String, value: String) -> Result<(), HashMapError> {
+        // TODO: Replace with a real hash function
+        let hash = key.len() as u64;
+
+        let entry: *mut Entry = Box::into_raw(Box::new(Entry {
+            node: HNode::from_hash(hash),
+            key,
+            value,
+        }));
+
+        unsafe { self._inner.insert(&mut (*entry).node as *mut HNode) }
+    }
+
+    pub fn get(&self) {}
+}
+
 // KV pair with an embedded hashtable node.
 #[derive(Default, Debug)]
 #[repr(C)]

@@ -41,6 +41,7 @@ fn hashtable_lookup() {
     let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
         let hnode = HNode::from_hash(hash).as_mut_ptr();
+        println!("{}", htable);
         unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
     fn eq(left: &HNode, right: &HNode) -> bool {
