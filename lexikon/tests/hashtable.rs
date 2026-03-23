@@ -1,4 +1,4 @@
-use lexikon::hashtable::{HNode, InnerHashTable};
+use lexikon::hashtable::{HNode, InnerHashTable, HashTable};
 
 #[test]
 fn hnode_default() {
@@ -7,14 +7,14 @@ fn hnode_default() {
 }
 
 #[test]
-fn hashtable_init() {
+fn inner_hashtable_init() {
     let htable = InnerHashTable::init(64).expect("Failed to init hashtable");
     assert!(htable.mask() == 63);
     assert!(htable.len() == 0);
 }
 
 #[test]
-fn hashtable_insert() {
+fn inner_hashtable_insert() {
     let hashes = [1, 2, 3, 4, 5];
     let mut htable = InnerHashTable::init(64).expect("Failed to init hashtable");
     for hash in hashes {
@@ -25,7 +25,7 @@ fn hashtable_insert() {
 }
 
 #[test]
-fn hashtable_insert_chain() {
+fn inner_hashtable_insert_chain() {
     let hashes = [1, 2, 3, 4, 5];
     let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
@@ -36,7 +36,7 @@ fn hashtable_insert_chain() {
 }
 
 #[test]
-fn hashtable_lookup() {
+fn inner_hashtable_lookup() {
     let hashes = [1, 2, 3, 4, 5];
     let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
@@ -61,7 +61,7 @@ fn hashtable_lookup() {
 }
 
 #[test]
-fn hashtable_deletion() {
+fn inner_hashtable_deletion() {
     let hashes = [1, 2, 3, 4, 5];
     let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
     for hash in hashes {
@@ -89,4 +89,14 @@ fn hashtable_deletion() {
     let found = found.expect("Failed to get node");
     unsafe { htable.detach(found).expect("Failed to delete node") };
     assert!(htable.len() == 2);
+}
+
+#[test]
+fn hashtable_insert() {
+    let keys = [("One", "pear") , ("Two", "apples"), ("Seven", "cars")];
+    let mut ht = HashTable::default();
+
+    for (key, value) in keys {
+        ht.insert(key.to_string(), value.to_string()).expect("Failed to insert key, value");
+    }
 }
