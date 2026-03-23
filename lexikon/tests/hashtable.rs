@@ -92,6 +92,20 @@ fn inner_hashtable_deletion() {
 }
 
 #[test]
+fn inner_hashtable_iter() {
+    let hashes = [1, 2, 3, 4, 5];
+    let mut htable = InnerHashTable::init(2).expect("Failed to init hashtable");
+    for hash in hashes {
+        let hnode = HNode::from_hash(hash).as_mut_ptr();
+        unsafe { htable.insert(hnode).expect("Failed to insert") };
+    }
+
+    for elem in htable.iter() {
+        println!("{:#?}", elem);
+    }
+}
+
+#[test]
 fn hashtable_insert() {
     let keys = [("One", "pear") , ("Two", "apples"), ("Seven", "cars")];
     let mut ht = HashTable::default();

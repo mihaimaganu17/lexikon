@@ -172,7 +172,7 @@ impl<'a> Iterator for InnerHashTableIter<'a> {
 
         unsafe {
             // While we still have slots to process and we have not processed all the keys
-            while next < self.pos {
+            while next <= self.pos {
                 let slot_ptr = self.table.tab.offset(slot);
                 // If the current slot is empty or we reached its end, go to the next slot
                 if slot_ptr.is_null() {
@@ -181,10 +181,12 @@ impl<'a> Iterator for InnerHashTableIter<'a> {
                 }
 
                 node_ptr = *slot_ptr;
-                while !node_ptr.is_null() && next < self.pos {
+                while !node_ptr.is_null() && next <= self.pos {
                     next = next.saturating_add(1);
                     node_ptr = (*node_ptr).next;
                 }
+
+                println!("Next {:#?} node_ptr {:#?}", next, node_ptr);
 
                 // We go to the next slot
                 if next != self.pos {
