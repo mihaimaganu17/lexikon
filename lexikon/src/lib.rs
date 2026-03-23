@@ -1,6 +1,6 @@
 mod event_loop;
-mod mem;
 pub mod hashtable;
+mod mem;
 mod protocol;
 
 use event_loop::ParseError;

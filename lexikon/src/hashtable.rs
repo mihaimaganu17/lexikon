@@ -1,8 +1,8 @@
 //! C-style chaining hashtable implementation
+use crate::container_of;
 use core::alloc::Layout;
 use std::alloc::alloc_zeroed;
 use std::fmt;
-use crate::container_of;
 
 #[derive(Default, Debug)]
 pub struct HashTable {
@@ -31,8 +31,7 @@ impl PartialEq for HNode {
     }
 }
 
-impl Entry {
-}
+impl Entry {}
 
 #[derive(Default, Debug)]
 pub struct HNode {
