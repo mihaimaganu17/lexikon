@@ -142,6 +142,62 @@ pub struct InnerHashTable {
     len: usize,
 }
 
+pub struct InnerHashTableIter<'a> {
+    table: &'a InnerHashTable,
+    pos: usize,
+}
+
+impl<'a> InnerHashTableIter<'a> {
+    pub fn new(table: &'a InnerHashTable) -> Self {
+        Self { table, pos: 0 }
+    }
+}
+
+impl<'a> Iterator for InnerHashTableIter<'a> {
+    type Item = &'a HNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.table.tab.is_null() {
+            return None;
+        }
+
+        // If we processed all the pointers, return None
+        if self.pos >= self.table.len {
+            return None;
+        }
+
+        let mut slot = 0;
+        let mut next = 0;
+        let mut node_ptr: *mut HNode = core::ptr::null::<HNode>() as *mut HNode;
+
+        unsafe {
+            // While we still have slots to process and we have not processed all the keys
+            while next < self.pos {
+                let slot_ptr = self.table.tab.offset(slot);
+                // If the current slot is empty or we reached its end, go to the next slot
+                if slot_ptr.is_null() {
+                    slot = slot.saturating_add(1);
+                    continue
+                }
+
+                node_ptr = *slot_ptr;
+                while !node_ptr.is_null() && next < self.pos {
+                    next = next.saturating_add(1);
+                    node_ptr = (*node_ptr).next;
+                }
+
+                // We go to the next slot
+                if next != self.pos {
+                    slot = slot.saturating_add(1);
+                }
+            }
+            // Update for the next iteration
+            self.pos = self.pos.saturating_add(1);
+            Some(&*node_ptr)
+        }
+    }
+}
+
 impl fmt::Display for InnerHashTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut idx = 0;
@@ -206,8 +262,13 @@ impl InnerHashTable {
         })
     }
 
-    /// Insert `node` in the hashtable in the first position that matches its hash. If the position
-    /// is already taken, `node`'s next will point to the already existing chain in the slot.
+    pub fn iter(&self) -> InnerHashTableIter<'_> {
+        InnerHashTableIter::new(self)
+    }
+
+    /// Insert `node` in the hashtable in the first position that matches its hash. If the
+    /// position is already taken, `node`'s next will point to the already existing chain in the
+    /// slot.
     pub unsafe fn insert(&mut self, node: *mut HNode) -> Result<(), InnerHashTableError> {
         // New item are inserted at the front of their respective position
         let pos = unsafe { ((*node).hash & self.mask as u64) as isize };
