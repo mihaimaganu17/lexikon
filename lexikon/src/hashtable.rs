@@ -4,15 +4,23 @@ use core::alloc::Layout;
 use std::alloc::alloc_zeroed;
 use std::fmt;
 
-#[derive(Default, Debug)]
+const DEFAULT_HASH_TABLE_INIT_SIZE: usize = 4;
+
+#[derive(Debug)]
 pub struct HashTable {
     _inner: HashMap,
 }
 
+impl Default for HashTable {
+    fn default() -> Self {
+        Self::new(DEFAULT_HASH_TABLE_INIT_SIZE)
+    }
+}
+
 impl HashTable {
-    pub fn new() -> Self {
+    pub fn new(size: usize) -> Self {
         Self {
-            _inner: HashMap::default()
+            _inner: HashMap::init(size).expect("Internal failure to create a `HashMap`"),
         }
     }
 
@@ -257,6 +265,14 @@ const K_MAX_LOAD_FACTOR: usize = 8;
 const K_REHASHING_WORK: usize = 128;
 
 impl HashMap {
+    pub fn init(size: usize) -> Result<Self, HashMapError> {
+        Ok(Self {
+            new: InnerHashTable::init(size)?,
+            old: None,
+            migrate_pos: 0,
+        })
+    }
+
     // When the load factor is too high, the `new` hash map is marked as `old` reallocated as
     // doubl the size of its previous size
     pub fn trigger_rehashing(&mut self) -> Result<(), HashMapError> {
