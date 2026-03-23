@@ -37,7 +37,43 @@ impl HashTable {
         unsafe { self._inner.insert(&mut (*entry).node as *mut HNode) }
     }
 
+    pub fn iter(&self) -> HashTableIter<'_> {
+        HashTableIter::new(&self)
+    }
+
     pub fn get(&self) {}
+
+    pub fn len(&self) -> usize {
+        let mut len = self._inner.new.len();
+        if let Some(old) = self._inner.old {
+            len += old.len();
+        }
+        len
+    }
+}
+
+pub struct HashTableIter<'a> {
+    table: &'a HashTable,
+    pos: usize,
+    len: usize,
+}
+
+impl<'a> HashTableIter<'a> {
+    pub fn new(ht: &'a HashTable) -> Self {
+        Self {
+            table: ht,
+            pos: 0,
+            len: ht.len(),
+        }
+    }
+}
+
+impl<'a> Iterator for HashTableIter<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
 }
 
 // KV pair with an embedded hashtable node.
