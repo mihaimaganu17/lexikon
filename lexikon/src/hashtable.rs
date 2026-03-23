@@ -177,7 +177,7 @@ impl<'a> Iterator for InnerHashTableIter<'a> {
                 // If the current slot is empty or we reached its end, go to the next slot
                 if slot_ptr.is_null() {
                     slot = slot.saturating_add(1);
-                    continue
+                    continue;
                 }
 
                 node_ptr = *slot_ptr;
