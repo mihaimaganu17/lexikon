@@ -43,8 +43,15 @@ impl HashTable {
 
     pub fn lookup(&self, key: String) -> Option<()> {
         let hash = key.len() as u64;
-        let entry_to_check = Entry { key, value: String::new(), node:  HNode::from_hash(hash) };
-        let hnode = unsafe { self._inner.lookup(&entry_to_check.node as *const HNode, HNode::eq)? };
+        let entry_to_check = Entry {
+            key,
+            value: String::new(),
+            node: HNode::from_hash(hash),
+        };
+        let hnode = unsafe {
+            self._inner
+                .lookup(&entry_to_check.node as *const HNode, HNode::eq)?
+        };
         let entry = container_of!(hnode, Entry, node);
         println!("{:#?}", unsafe { &(*entry).value });
         Some(())
