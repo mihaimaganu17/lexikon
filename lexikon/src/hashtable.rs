@@ -41,7 +41,14 @@ impl HashTable {
         HashTableIter::new(&self)
     }
 
-    pub fn get(&self) {}
+    pub fn lookup(&self, key: String) -> Option<()> {
+        let hash = key.len() as u64;
+        let node = HNode::from_hash(hash).as_ptr();
+        let hnode = unsafe { self._inner.lookup(node, HNode::eq)? };
+        let entry = container_of!(hnode, Entry, node);
+        println!("{:#?}", entry);
+        Some(())
+    }
 
     pub fn len(&self) -> usize {
         let mut len = self._inner.new.len();
