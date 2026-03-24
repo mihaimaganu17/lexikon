@@ -111,11 +111,13 @@ fn inner_hashtable_iter() {
 
 #[test]
 fn hashtable_insert() {
-    let keys = [("One", "pear"), ("Two", "apples"), ("Seven", "cars")];
+    let keys = [("One", "pear"), ("Four", "apples"), ("Seven", "cars")];
     let mut ht = HashTable::default();
 
     for (key, value) in keys {
         ht.insert(key.to_string(), value.to_string())
             .expect("Failed to insert key, value");
     }
+
+    let a = ht.lookup("Four".to_string()).expect("Unable to find key");
 }
