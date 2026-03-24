@@ -162,17 +162,18 @@ impl<'a> Iterator for InnerHashTableIter<'a> {
         }
 
         // If we processed all the pointers, return None
-        if self.pos >= self.table.len {
+        if self.pos >= self.table.len() {
             return None;
         }
 
         let mut slot = 0;
-        let mut next = 0;
+        let mut next = 0usize;
         let mut node_ptr: *mut HNode = core::ptr::null::<HNode>() as *mut HNode;
+        let mut to_return = node_ptr;
 
         unsafe {
             // While we still have slots to process and we have not processed all the keys
-            while next <= self.pos {
+            while self.pos < self.table.len() {
                 let slot_ptr = self.table.tab.offset(slot);
                 // If the current slot is empty or we reached its end, go to the next slot
                 if slot_ptr.is_null() {
@@ -181,19 +182,21 @@ impl<'a> Iterator for InnerHashTableIter<'a> {
                 }
 
                 node_ptr = *slot_ptr;
-                while !node_ptr.is_null() && next <= self.pos {
+                while !node_ptr.is_null() && next < self.pos {
                     next = next.saturating_add(1);
                     node_ptr = (*node_ptr).next;
                 }
 
-                println!("Next {:#?} node_ptr {:#?}", next, node_ptr);
-
-                // We go to the next slot
-                if next != self.pos {
+                if node_ptr.is_null() {
                     slot = slot.saturating_add(1);
+                    continue;
+                }
+
+                if next == self.pos {
+                    break;
                 }
             }
-            // Update for the next iteration
+
             self.pos = self.pos.saturating_add(1);
             Some(&*node_ptr)
         }
