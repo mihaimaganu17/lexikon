@@ -99,10 +99,14 @@ fn inner_hashtable_iter() {
         unsafe { htable.insert(hnode).expect("Failed to insert") };
     }
 
-    println!("{}", htable);
-    for elem in htable.iter() {
-        println!("{:#?}", elem);
-    }
+    let mut ht_iter = htable.iter();
+
+    assert!(ht_iter.next().unwrap().hash() == 4);
+    assert!(ht_iter.next().unwrap().hash() == 2);
+    assert!(ht_iter.next().unwrap().hash() == 5);
+    assert!(ht_iter.next().unwrap().hash() == 3);
+    assert!(ht_iter.next().unwrap().hash() == 1);
+    assert!(ht_iter.next() == None);
 }
 
 #[test]
